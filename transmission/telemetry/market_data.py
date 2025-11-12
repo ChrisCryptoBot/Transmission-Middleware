@@ -98,19 +98,13 @@ class Telemetry:
             adx_df = ta.adx(high=high, low=low, close=close, length=period)
             if adx_df is None or adx_df.empty:
                 return 0.0
-            return float(adx_df[f'ADX_{period}'].iloc[-1])
+            # Get the last ADX value
+            adx_value = adx_df.iloc[-1, 0]  # First column is ADX
+            return float(adx_value)
         else:
             # Fallback: Simple directional movement calculation
             # This is a simplified version - for production, use pandas_ta
             return 20.0  # Placeholder - implement full ADX if needed
-        
-        if adx_df is None or adx_df.empty:
-            return 0.0
-        
-        # Get the last ADX value
-        adx_value = adx_df.iloc[-1, 0]  # First column is ADX
-        
-        return float(adx_value) if not pd.isna(adx_value) else 0.0
     
     def calculate_vwap(
         self,
@@ -219,8 +213,16 @@ class Telemetry:
         if len(close) < period + 1:
             return 0.0
         
-        # Use pandas_ta for ATR calculation
-        atr_series = ta.atr(high=high, low=low, close=close, length=period)
+        # Use pandas_ta for ATR calculation if available, else fallback
+        if HAS_PANDAS_TA:
+            atr_series = ta.atr(high=high, low=low, close=close, length=period)
+        else:
+            # Fallback: Manual ATR calculation
+            high_low = high - low
+            high_close = np.abs(high - close.shift())
+            low_close = np.abs(low - close.shift())
+            tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+            atr_series = tr.rolling(window=period).mean()
         
         if atr_series is None or atr_series.empty:
             return 0.0
