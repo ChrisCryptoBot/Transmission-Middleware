@@ -1,0 +1,95 @@
+Verify Import Paths & Dependencies
+
+Check all imports for accuracy and correct relative paths.
+
+Ensure all referenced modules, assets, and hooks exist and are properly exported.
+
+Replace redundant or circular imports with modular shared utilities if needed.
+
+Routing & Navigation
+
+Confirm that all navigation buttons, sidebars, and route links point to valid routes.
+
+Ensure react-router-dom or the routing framework in use is properly wired.
+
+Validate that route guards (auth checks, org scoping) function as intended.
+
+Button & Interaction Logic
+
+Verify every button, link, and action (e.g., “Refresh”, “View Details”, “Open Calendar”) executes its intended function.
+
+Ensure no redundant or dead buttons exist.
+
+Add missing handler logic if necessary.
+
+Confirm all async actions are error-handled and loading states are present.
+
+UI/UX Quality Review
+
+Conform to Superior One’s UI Gold Standard:
+
+Evaluate component hierarchy for simplicity and readability.
+
+Optimize for responsiveness (mobile/tablet/desktop).
+
+Convert fixed pixel values to relative units (rem, %, vw/vh) as needed.
+
+Use Tailwind’s responsive breakpoints for mobile readiness.
+
+Workflow Integration
+
+Validate this component’s end-to-end role in the system workflow.
+
+Data fetching (from backend APIs or context)
+
+State updates (React Query, Redux, Zustand, etc.)
+
+Navigation to subsequent steps (load creation → dispatch → invoicing, etc.)
+
+Ensure all critical data paths (props, hooks, API responses) are correctly wired.
+
+Efficiency & Maintainability
+
+Eliminate redundant logic and repeated queries.
+
+Merge overlapping functions or components when appropriate.
+
+Ensure all API calls use shared fetch utilities with consistent error handling.
+
+Optimize rendering and re-render triggers.
+
+Safety & Error Handling
+
+Add error boundaries where needed.
+
+Validate all external data before rendering.
+
+Ensure secure handling of tokens, sensitive data, or environment variables.
+
+Check that forms and modals sanitize input and handle validation errors gracefully.
+
+Enhancements (If Justified)
+
+You may add small, high-impact improvements if they:
+
+Improve user experience or clarity
+
+Fill clear workflow gaps
+
+Simplify redundant steps
+
+Do not introduce unnecessary complexity
+
+Code Quality & Standards
+
+Ensure consistent TypeScript typings and prop interfaces.
+
+Use clear naming conventions and JSDoc/TSDoc where appropriate.
+
+Ensure ESLint and Prettier formatting compliance.
+
+Testing & Verification
+
+Recommend key unit or integration tests (with React Testing Library or Vitest).
+
+Suggest mock data or fixtures for dashboards that depend on live APIs.

@@ -1,0 +1,114 @@
+Optimize the frontend design using modern CSS and design principles:
+
+## Visual Design System
+
+**Color & Effects:**
+- Implement glassmorphism with backdrop-filter: blur() and semi-transparent backgrounds
+- Use duotone color overlays for images and backgrounds (gradient-based color mapping)
+- Apply CSS color-mix() for dynamic color variations
+- Implement smooth color transitions with CSS custom properties
+
+**Modern CSS Features:**
+- Use CSS Grid and Flexbox for responsive layouts
+- Implement container queries for component-level responsiveness
+- Apply CSS scroll-snap for smooth section navigation
+- Use CSS :has() selector for parent-based styling
+- Implement view transitions API for smooth page changes
+
+**Depth & Dimension:**
+- Multi-layered shadows (not just one box-shadow)
+- Subtle inset shadows for depth
+- Floating elements with transform: translateZ()
+- Neumorphism accents on interactive elements
+- Gradient borders using border-image or pseudo-elements
+
+**Typography:**
+- Variable fonts for performance and flexibility
+- Fluid typography using clamp() for responsive scaling
+- Text gradients with background-clip: text
+- Proper hierarchy with contrasting weights
+- Letter-spacing adjustments for readability
+
+**Micro-interactions:**
+- Hover states with transform and scale
+- Loading states with skeleton screens
+- Smooth transitions (200-300ms cubic-bezier easing)
+- Success/error state animations
+- Progress indicators with CSS animations
+
+**Glass Morphism Specifics:**
+- backdrop-filter: blur(10px) saturate(180%)
+- background: rgba(255, 255, 255, 0.1) or rgba(0, 0, 0, 0.1)
+- border: 1px solid rgba(255, 255, 255, 0.2)
+- box-shadow with multiple layers for depth
+
+**Duotone Implementation:**
+- CSS mix-blend-mode for image color effects
+- SVG filters for precise duotone control
+- Background gradients with multiply blend mode
+- Two-color gradients mapped to luminosity
+
+## Layout Principles
+
+- Consistent spacing scale (4px, 8px, 16px, 24px, 32px, 48px, 64px)
+- Maximum content width: 1440px
+- Generous whitespace (don't cram content)
+- Clear visual hierarchy
+- Mobile-first responsive design
+
+## Component-Specific Requirements
+
+**Cards:**
+- Subtle hover elevation
+- Glass morphism borders
+- Internal padding: 24px
+- Border radius: 12px or 16px
+
+**Buttons:**
+- Primary: Gradient background with glass overlay
+- Secondary: Ghost style with glass border
+- Hover: Slight scale (1.02) and brightness increase
+- Active: Scale down slightly (0.98)
+
+**Forms:**
+- Glass morphism inputs with subtle border
+- Focus states with glow effect
+- Floating labels
+- Inline validation with smooth transitions
+
+**Navigation:**
+- Sticky header with backdrop blur
+- Active state indicators
+- Smooth scroll behavior
+- Mobile hamburger with slide-out animation
+
+**Data Visualizations:**
+- Use duotone for charts/graphs
+- Animated counters for metrics
+- Progress bars with gradient fills
+- Hover tooltips with glass effect
+
+## Performance Optimization
+
+- Use will-change sparingly
+- Implement CSS containment
+- Lazy load images with fade-in
+- Use transform instead of position changes
+- Minimize repaints with GPU-accelerated properties
+
+## Accessibility
+
+- Maintain WCAG AA contrast ratios (especially with glass effects)
+- Ensure focus indicators are visible
+- Support prefers-reduced-motion
+- Proper ARIA labels
+- Keyboard navigation support
+
+## Dark Mode Support
+
+- Use CSS custom properties for theme switching
+- Adjust glass morphism opacity for dark backgrounds
+- Invert duotone for dark mode
+- Ensure sufficient contrast in both modes
+
+Apply these principles consistently across all components while maintaining a cohesive brand identity.
