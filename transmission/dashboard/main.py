@@ -166,7 +166,7 @@ def main():
     """Main dashboard"""
     
     # Header
-    st.title("⚙️ Transmission™ Dashboard")
+    st.title("⚙️ Beyond Candlesticks - Dashboard")
     st.markdown("**Adaptive Trading Middleware - Real-Time Monitoring**")
     
     # Check API connection
