@@ -30,11 +30,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(trades.router)
-app.include_router(metrics.router)
-app.include_router(system.router)
-app.include_router(signals.router)
+# Include routers with /api prefix
+app.include_router(trades.router, prefix="/api")
+app.include_router(metrics.router, prefix="/api")
+app.include_router(system.router, prefix="/api")
+app.include_router(signals.router, prefix="/api")
 
 # WebSocket endpoint
 app.websocket("/ws")(websocket_endpoint)
@@ -78,7 +78,8 @@ async def shutdown_event():
 async def root():
     """Root endpoint"""
     return {
-        "name": "Transmission™ API",
+        "name": "Beyond Candlesticks",
+        "description": "Adaptive Trading Middleware - Transmission™ API",
         "version": "0.1.0",
         "status": "running",
         "endpoints": {
@@ -86,7 +87,9 @@ async def root():
             "trades": "/api/trades",
             "metrics": "/api/metrics",
             "risk": "/api/system/risk",
-            "websocket": "/ws"
+            "health": "/api/system/health",
+            "websocket": "/ws",
+            "docs": "/docs"
         }
     }
 
