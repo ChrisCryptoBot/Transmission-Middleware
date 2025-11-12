@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Dashboard } from './pages/Dashboard';
+import Dashboard from './pages/Dashboard';
 import Trades from './pages/Trades';
 import { useUIStore } from './state/uiStore';
 
