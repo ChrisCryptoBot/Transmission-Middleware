@@ -4,31 +4,49 @@ FastAPI Main Application
 Transmission™ API Server
 """
 
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from loguru import logger
 import uvicorn
+import os
+from datetime import datetime
 
 from transmission.api.routes import trades, metrics, system, signals
 from transmission.api.websocket import websocket_endpoint, set_orchestrator as set_ws_orchestrator
+from transmission.api.dependencies import set_orchestrator as set_dep_orchestrator
+from transmission.api.middleware import LoggingMiddleware, SecurityHeadersMiddleware
+from transmission.api.exceptions import APIException
 from transmission.orchestrator.transmission import TransmissionOrchestrator, SystemState
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Beyond Candlesticks",
     description="Adaptive Trading Middleware - Transmission™ API",
-    version="0.1.0"
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
-# CORS middleware (configure for production)
+# CORS configuration (environment-based)
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
+if cors_origins == ["*"]:
+    logger.warning("CORS is set to allow all origins. Configure CORS_ORIGINS for production.")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Configure for production
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["X-Process-Time"]
 )
+
+# Add custom middleware
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(LoggingMiddleware)
 
 # Include routers with /api prefix
 app.include_router(trades.router, prefix="/api")
@@ -52,10 +70,11 @@ async def startup_event():
         logger.info("Initializing Transmission Orchestrator...")
         orchestrator = TransmissionOrchestrator()
         
-        # Set orchestrator in route modules
+        # Set orchestrator in route modules and dependencies
         system.set_orchestrator(orchestrator)
         signals.set_orchestrator(orchestrator)
         set_ws_orchestrator(orchestrator)
+        set_dep_orchestrator(orchestrator)
         
         logger.info("Transmission API ready")
     except Exception as e:
@@ -104,13 +123,46 @@ async def api_info():
     }
 
 
+@app.exception_handler(APIException)
+async def api_exception_handler(request: Request, exc: APIException):
+    """Handle custom API exceptions"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.error_code or "API_ERROR",
+            "detail": exc.detail,
+            "metadata": exc.metadata,
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors"""
+    errors = exc.errors()
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": "VALIDATION_ERROR",
+            "detail": "Request validation failed",
+            "errors": errors,
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    """Global exception handler"""
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler for unhandled exceptions"""
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)}
+        content={
+            "error": "INTERNAL_ERROR",
+            "detail": "Internal server error",
+            "timestamp": datetime.now().isoformat()
+        }
     )
 
 

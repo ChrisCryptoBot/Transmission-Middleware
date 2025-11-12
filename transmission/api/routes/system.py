@@ -4,14 +4,17 @@ System Status API Routes
 Endpoints for system status, risk, and health checks.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from transmission.api.models.system import SystemStatusResponse, RiskStatusResponse
+from transmission.api.dependencies import get_orchestrator, get_orchestrator_optional
+from transmission.api.exceptions import ServiceUnavailableError, InternalServerError
 from transmission.orchestrator.transmission import TransmissionOrchestrator
 from transmission.database import Database
+from datetime import datetime
 
 router = APIRouter(prefix="/system", tags=["system"])
 
-# Global orchestrator instance (will be initialized in main.py)
+# Keep backward compatibility
 orchestrator: TransmissionOrchestrator = None
 
 
@@ -22,19 +25,18 @@ def set_orchestrator(orch: TransmissionOrchestrator):
 
 
 @router.get("/status", response_model=SystemStatusResponse)
-async def get_system_status():
+async def get_system_status(
+    orch: TransmissionOrchestrator = Depends(get_orchestrator)
+):
     """Get current system status"""
     try:
-        if orchestrator is None:
-            raise HTTPException(status_code=503, detail="System not initialized")
-        
-        risk_status = orchestrator.get_risk_status()
-        tripwire = orchestrator.risk_governor.check_tripwires()
+        risk_status = orch.get_risk_status()
+        tripwire = orch.risk_governor.check_tripwires()
         
         return SystemStatusResponse(
-            system_state=orchestrator.get_current_state().value,
-            current_regime=orchestrator.get_current_regime(),
-            active_strategy=orchestrator.get_current_strategy(),
+            system_state=orch.get_current_state().value,
+            current_regime=orch.get_current_regime(),
+            active_strategy=orch.get_current_strategy(),
             daily_pnl_r=risk_status['daily_pnl_r'],
             weekly_pnl_r=risk_status['weekly_pnl_r'],
             current_r=risk_status['current_r'],
@@ -43,7 +45,7 @@ async def get_system_status():
             risk_reason=tripwire.reason
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting system status: {str(e)}")
+        raise InternalServerError(f"Error getting system status: {str(e)}")
 
 
 @router.get("/risk", response_model=RiskStatusResponse)
@@ -69,7 +71,9 @@ async def get_risk_status():
 
 
 @router.get("/health")
-async def health_check():
+async def health_check(
+    orch: TransmissionOrchestrator = Depends(get_orchestrator_optional)
+):
     """Health check endpoint"""
     try:
         # Check database connection
@@ -80,17 +84,22 @@ async def health_check():
         return {
             "status": "healthy",
             "database": "connected",
-            "orchestrator": "ready" if orchestrator else "not_initialized"
+            "orchestrator": "ready" if orch else "not_initialized",
+            "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
         return {
             "status": "unhealthy",
-            "error": str(e)
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
         }
 
 
 @router.post("/flatten_all")
-async def flatten_all(payload: dict):
+async def flatten_all(
+    payload: dict,
+    orch: TransmissionOrchestrator = Depends(get_orchestrator)
+):
     """
     Flatten all positions (kill switch).
     
@@ -98,18 +107,16 @@ async def flatten_all(payload: dict):
         reason: Optional reason for flattening
     """
     try:
-        if orchestrator is None:
-            raise HTTPException(status_code=503, detail="System not initialized")
-        
         reason = payload.get("reason", "manual_button")
-        orchestrator.flatten_all_manual(reason)
+        orch.flatten_all_manual(reason)
         
         return {
             "status": "ok",
-            "message": f"All positions flattened: {reason}"
+            "message": f"All positions flattened: {reason}",
+            "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error flattening positions: {str(e)}")
+        raise InternalServerError(f"Error flattening positions: {str(e)}")
 
 
 @router.get("/orders")
