@@ -6,7 +6,7 @@
 
 **Terminal 1:**
 ```bash
-python run_api.py
+python startup/run_api.py
 ```
 
 **Or manually:**
@@ -58,7 +58,7 @@ http://localhost:8000/api/system/health
 
 **Terminal 2:**
 ```bash
-python run_dashboard.py
+python startup/run_dashboard.py
 ```
 
 **Or manually:**
@@ -188,8 +188,8 @@ streamlit run transmission/dashboard/main.py --server.port 8502
 
 ## 🎯 Next Steps
 
-1. **Start API**: `python run_api.py`
-2. **Start Dashboard**: `python run_dashboard.py` (in another terminal)
+1. **Start API**: `python startup/run_api.py`
+2. **Start Dashboard**: `python startup/run_dashboard.py` (in another terminal)
 3. **Open Dashboard**: `http://localhost:8501`
 4. **View API Docs**: `http://localhost:8000/docs`
 5. **Test Endpoints**: Use Swagger UI or curl
