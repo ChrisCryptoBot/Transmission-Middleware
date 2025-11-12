@@ -197,11 +197,10 @@ class TransmissionOrchestrator:
             self.state = SystemState.ANALYZING
             
             # Step 1: Calculate market features
-            features = self.telemetry.calculate_all_features(
-                bars_15m=bars_15m,
-                current_price=current_price,
-                bid=bid,
-                ask=ask
+            features = self.telemetry.calculate(
+                bar_data=bars_15m,
+                news_calendar={},  # TODO: Load from config
+                historical_vwap=None  # TODO: Calculate from historical data
             )
             
             # Step 2: Check risk tripwires
@@ -259,48 +258,80 @@ class TransmissionOrchestrator:
             
             if contracts < 1:
                 logger.info("Position too small after sizing - skipping trade")
+                self._broadcast_rejection("position_too_small", "Position size < 1 contract")
                 return None
             
             signal.contracts = contracts
             
-            # Step 8: Validate constraints
+            # Step 8: Validate constraints (Smart Constraints)
+            if bid is not None and ask is not None:
+                spread_ticks = self.telemetry.calculate_spread_ticks(bid, ask)
+            else:
+                spread_ticks = features.spread_ticks if hasattr(features, 'spread_ticks') else 1.0
+            
             constraint_result = self.constraint_engine.validate_trade(
-                signal_contracts=signal.contracts,
+                symbol=signal.symbol,
                 risk_dollars=risk_dollars,
-                news_proximity_min=features.news_proximity_min
+                spread_ticks=spread_ticks,
+                estimated_slippage_ticks=features.entry_p90_slippage if hasattr(features, 'entry_p90_slippage') else 1.0,
+                news_proximity_min=features.news_proximity_min,
+                mental_state=5,  # TODO: Get from mental governor
+                account_equity=None,  # TODO: Get from account
+                dll_remaining=dll_constraint
             )
             
             if not constraint_result.approved:
                 logger.warning(f"Trade blocked by constraints: {constraint_result.reason}")
+                self.database.save_system_state(
+                    system_state="constraint_violation",
+                    current_regime=self.current_regime,
+                    active_strategy=signal.strategy
+                )
+                self._broadcast_rejection("constraint_violation", constraint_result.reason)
                 return None
             
-            # Adjust contracts if needed (constraint engine may reduce further)
-            if constraint_result.adjusted_contracts is not None:
-                signal.contracts = constraint_result.adjusted_contracts
-                logger.info(f"Contracts adjusted: {constraint_result.reason}")
-            
-            # Step 9: Check execution quality
+            # Step 9: Check execution quality (Guard)
             if bid is not None and ask is not None:
-                spread_ticks = self.telemetry.calculate_spread_ticks(bid, ask)
                 execution_check = self.execution_guard.validate_execution(
                     spread_ticks=spread_ticks,
                     order_size=signal.contracts
                 )
                 
                 if not execution_check.approved:
-                    logger.warning(f"Execution blocked: {execution_check.reason}")
+                    logger.warning(f"Execution blocked by guard: {execution_check.reason}")
+                    self.database.save_system_state(
+                        system_state="guard_reject",
+                        current_regime=self.current_regime,
+                        active_strategy=signal.strategy
+                    )
+                    self._broadcast_rejection("guard_reject", execution_check.reason)
                     return None
                 
                 signal.notes = f"{signal.notes or ''} | Order type: {execution_check.recommended_order_type}"
             
-            logger.info(
-                f"Signal generated: {signal.strategy} {signal.direction} "
-                f"{signal.contracts} contracts @ {signal.entry_price:.2f}, "
-                f"stop: {signal.stop_price:.2f}, target: {signal.target_price:.2f}"
+            # Step 10: Execute trade
+            order_id = self.execution_engine.place_signal(
+                signal=signal,
+                qty=float(signal.contracts)
             )
             
-            # Log signal to database (entry will be logged when trade is executed)
-            # For now, we just log that a signal was generated
+            if order_id is None:
+                logger.error("Order submission failed")
+                return None
+            
+            # Step 11: Journal + Broadcast
+            self.database.save_system_state(
+                system_state="order_submitted",
+                current_regime=self.current_regime,
+                active_strategy=signal.strategy
+            )
+            self._broadcast_order_submitted(order_id, signal)
+            
+            logger.info(
+                f"Signal executed: {signal.strategy} {signal.direction} "
+                f"{signal.contracts} contracts @ {signal.entry_price:.2f} "
+                f"(order_id: {order_id})"
+            )
             
             return signal
             
