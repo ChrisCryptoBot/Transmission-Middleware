@@ -108,7 +108,7 @@ async def get_trade(trade_id: int):
 
 
 @router.get("/recent/{limit}", response_model=TradeListResponse)
-async def get_recent_trades(limit: int = Query(default=20, ge=1, le=100)):
+async def get_recent_trades(limit: int):
     """Get recent trades"""
     try:
         db = Database()
