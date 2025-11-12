@@ -15,7 +15,7 @@ import plotly.express as px
 
 # Page config
 st.set_page_config(
-    page_title="Transmission™ Dashboard",
+    page_title="Beyond Candlesticks - Dashboard",
     page_icon="⚙️",
     layout="wide",
     initial_sidebar_state="expanded"
