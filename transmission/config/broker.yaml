@@ -1,0 +1,29 @@
+# Transmission™ Broker Configuration
+
+broker:
+  mode: "mock"  # Options: mock | paper | live
+  name: "mock"  # Options: mock | alpaca | kraken | tradovate | etc.
+  
+  # API credentials (only used for live mode)
+  api_key: ""
+  api_secret: ""
+  api_url: ""
+  
+  # Mock broker settings
+  mock:
+    slippage_ticks: 0.5
+    latency_ms: 50.0
+    fill_probability: 1.0
+  
+  # Paper trading settings
+  paper:
+    price_source: "last_quote"  # Options: last_quote | last_trade | mid_price
+    slippage_model: "fixed"  # Options: fixed | random | volume_based
+    slippage_ticks: 0.5
+
+execution:
+  guard_mode: "strict"  # Options: strict | lenient | off
+  oco_emulation: true  # Emulate OCO orders if broker doesn't support
+  auto_flatten_on_tripwire: true  # Auto-flatten when risk limits hit
+  max_order_retries: 3  # Max retries for failed orders
+
