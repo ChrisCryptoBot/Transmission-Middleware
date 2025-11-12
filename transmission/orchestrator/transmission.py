@@ -36,6 +36,7 @@ from transmission.risk.news_flat import NewsFlat
 from transmission.analytics.journal_analytics import JournalAnalytics
 from transmission.database import Database
 from transmission.config.config_loader import ConfigLoader
+from datetime import datetime
 
 
 class SystemState(Enum):

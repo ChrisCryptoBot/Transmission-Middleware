@@ -33,6 +33,9 @@ async def get_system_status(
         risk_status = orch.get_risk_status()
         tripwire = orch.risk_governor.check_tripwires()
         
+        # Get mental state info
+        mental_info = orch.mental_governor.get_state_info()
+        
         return SystemStatusResponse(
             system_state=orch.get_current_state().value,
             current_regime=orch.get_current_regime(),
@@ -41,8 +44,8 @@ async def get_system_status(
             weekly_pnl_r=risk_status['weekly_pnl_r'],
             current_r=risk_status['current_r'],
             consecutive_red_days=risk_status['consecutive_red_days'],
-            can_trade=tripwire.can_trade,
-            risk_reason=tripwire.reason
+            can_trade=tripwire.can_trade and mental_info['can_trade'],
+            risk_reason=tripwire.reason if not tripwire.can_trade else mental_info.get('reason', 'All clear')
         )
     except Exception as e:
         raise InternalServerError(f"Error getting system status: {str(e)}")
