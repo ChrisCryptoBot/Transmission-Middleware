@@ -29,6 +29,11 @@ from transmission.execution.guard import ExecutionGuard, ExecutionCheck
 from transmission.execution.engine import ExecutionEngine
 from transmission.execution.adapter import BrokerAdapter
 from transmission.execution.mock_broker import MockBrokerAdapter
+from transmission.execution.in_trade_manager import InTradeManager, TrailingStopConfig, TrailingStopMode, ScaleOutRule
+from transmission.telemetry.multi_tf_fusion import MultiTimeframeFusion
+from transmission.risk.mental_governor import MentalGovernor, MentalState
+from transmission.risk.news_flat import NewsFlat
+from transmission.analytics.journal_analytics import JournalAnalytics
 from transmission.database import Database
 from transmission.config.config_loader import ConfigLoader
 
@@ -118,6 +123,17 @@ class TransmissionOrchestrator:
         
         # Position Sizing
         self.position_sizer = PositionSizer()
+        
+        # New modules
+        self.in_trade_manager = InTradeManager(tick_size=0.25)
+        self.multi_tf_fusion = MultiTimeframeFusion(
+            ltf_interval="1m",
+            htf_intervals=["15m", "1h"],
+            gate_on_disagreement=config.get('execution', {}).get('htf_gating', True)
+        )
+        self.mental_governor = MentalGovernor()
+        self.news_flat = NewsFlat()
+        self.journal_analytics = JournalAnalytics(database=database if database else Database(db_path=db_path))
         
         # Database
         if database is None:
@@ -220,7 +236,7 @@ class TransmissionOrchestrator:
                 logger.info(f"Regime {regime_result.regime} - no trading allowed")
                 return None
             
-            # Step 5: Select strategy based on regime
+            # Step 8: Select strategy based on regime
             strategy = self._select_strategy(regime_result.regime)
             if strategy is None:
                 logger.info(f"No strategy available for regime {regime_result.regime}")
@@ -228,7 +244,7 @@ class TransmissionOrchestrator:
             
             self.current_strategy = strategy
             
-            # Step 6: Generate signal
+            # Step 9: Generate signal
             signal = strategy.generate_signal(
                 features=features,
                 regime=regime_result.regime,
@@ -240,12 +256,16 @@ class TransmissionOrchestrator:
             
             self.state = SystemState.SIGNAL_GENERATED
             
-            # Step 7: Calculate position size (ATR-normalized)
+            # Step 10: Calculate position size (ATR-normalized)
             risk_dollars = self.risk_governor.get_current_r()
             stop_distance_points = abs(signal.entry_price - signal.stop_price)
             
             # Get DLL constraint if available
             dll_constraint = self.constraint_engine.get_dll_constraint()
+            
+            # Apply mental state multiplier
+            mental_result = self.mental_governor.evaluate()
+            risk_dollars *= mental_result.size_multiplier
             
             # Calculate contracts with ATR normalization
             contracts = self.position_sizer.calculate_contracts(
@@ -254,7 +274,7 @@ class TransmissionOrchestrator:
                 atr_current=features.atr_14,
                 atr_baseline=features.baseline_atr,
                 dll_constraint=dll_constraint,
-                mental_state=5  # TODO: Get from mental governor when implemented
+                mental_state=mental_result.current_state.value
             )
             
             if contracts < 1:
@@ -276,7 +296,7 @@ class TransmissionOrchestrator:
                 spread_ticks=spread_ticks,
                 estimated_slippage_ticks=features.entry_p90_slippage if hasattr(features, 'entry_p90_slippage') else 1.0,
                 news_proximity_min=features.news_proximity_min,
-                mental_state=5,  # TODO: Get from mental governor
+                mental_state=mental_result.current_state.value,
                 account_equity=None,  # TODO: Get from account
                 dll_remaining=dll_constraint
             )
