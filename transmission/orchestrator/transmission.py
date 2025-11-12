@@ -25,6 +25,7 @@ from transmission.risk.constraint_engine import ConstraintEngine, ValidationResu
 from transmission.strategies.base import BaseStrategy, Signal, Position
 from transmission.strategies.vwap_pullback import VWAPPullbackStrategy
 from transmission.execution.guard import ExecutionGuard, ExecutionCheck
+from transmission.database import Database
 
 
 class SystemState(Enum):
@@ -57,7 +58,8 @@ class TransmissionOrchestrator:
         self,
         risk_governor: Optional[RiskGovernor] = None,
         constraint_engine: Optional[ConstraintEngine] = None,
-        db_path: Optional[str] = None
+        db_path: Optional[str] = None,
+        database: Optional[Database] = None
     ):
         """
         Initialize Transmission Orchestrator.
@@ -82,6 +84,11 @@ class TransmissionOrchestrator:
         
         # Execution
         self.execution_guard = ExecutionGuard()
+        
+        # Database
+        if database is None:
+            database = Database(db_path=db_path)
+        self.database = database
         
         # Strategies
         self.strategies: Dict[str, BaseStrategy] = {
@@ -218,6 +225,9 @@ class TransmissionOrchestrator:
                 f"stop: {signal.stop_price:.2f}, target: {signal.target_price:.2f}"
             )
             
+            # Log signal to database (entry will be logged when trade is executed)
+            # For now, we just log that a signal was generated
+            
             return signal
             
         except Exception as e:
@@ -237,18 +247,51 @@ class TransmissionOrchestrator:
         """
         return self.strategies.get(regime)
     
-    def record_trade_result(self, pnl_r: float) -> None:
+    def record_trade_result(
+        self,
+        trade_id: int,
+        exit_price: float,
+        exit_reason: str,
+        pl_amount_gross: float,
+        pnl_r: float,
+        fees_paid: float,
+        holding_duration_minutes: float,
+        entry_slippage_ticks: float = 0.0,
+        exit_slippage_ticks: float = 0.0
+    ) -> None:
         """
         Record completed trade result.
         
         Args:
+            trade_id: Database trade ID
+            exit_price: Exit price
+            exit_reason: Reason for exit
+            pl_amount_gross: Gross P&L in dollars
             pnl_r: Profit/loss in R units
+            fees_paid: Fees paid
+            holding_duration_minutes: Holding duration
+            entry_slippage_ticks: Entry slippage
+            exit_slippage_ticks: Exit slippage
         """
+        # Update database
+        self.database.update_trade_exit(
+            trade_id=trade_id,
+            exit_price=exit_price,
+            exit_reason=exit_reason,
+            pl_amount_gross=pl_amount_gross,
+            result_r=pnl_r,
+            fees_paid=fees_paid,
+            holding_duration_minutes=holding_duration_minutes,
+            entry_slippage_ticks=entry_slippage_ticks,
+            exit_slippage_ticks=exit_slippage_ticks
+        )
+        
+        # Update risk governor
         self.risk_governor.record_trade(pnl_r)
         self.constraint_engine.record_trade()
         self.state = SystemState.READY
         
-        logger.info(f"Trade result recorded: {pnl_r:+.2f}R")
+        logger.info(f"Trade {trade_id} result recorded: {pnl_r:+.2f}R")
     
     def get_current_state(self) -> SystemState:
         """Get current system state"""
