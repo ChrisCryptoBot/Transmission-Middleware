@@ -188,8 +188,30 @@ class TransmissionOrchestrator:
             
             self.state = SystemState.SIGNAL_GENERATED
             
-            # Step 7: Validate constraints
+            # Step 7: Calculate position size (ATR-normalized)
             risk_dollars = self.risk_governor.get_current_r()
+            stop_distance_points = abs(signal.entry_price - signal.stop_price)
+            
+            # Get DLL constraint if available
+            dll_constraint = self.constraint_engine.get_dll_constraint()
+            
+            # Calculate contracts with ATR normalization
+            contracts = self.position_sizer.calculate_contracts(
+                risk_dollars=risk_dollars,
+                stop_points=stop_distance_points,
+                atr_current=features.atr_14,
+                atr_baseline=features.baseline_atr,
+                dll_constraint=dll_constraint,
+                mental_state=5  # TODO: Get from mental governor when implemented
+            )
+            
+            if contracts < 1:
+                logger.info("Position too small after sizing - skipping trade")
+                return None
+            
+            signal.contracts = contracts
+            
+            # Step 8: Validate constraints
             constraint_result = self.constraint_engine.validate_trade(
                 signal_contracts=signal.contracts,
                 risk_dollars=risk_dollars,
@@ -200,12 +222,12 @@ class TransmissionOrchestrator:
                 logger.warning(f"Trade blocked by constraints: {constraint_result.reason}")
                 return None
             
-            # Adjust contracts if needed
+            # Adjust contracts if needed (constraint engine may reduce further)
             if constraint_result.adjusted_contracts is not None:
                 signal.contracts = constraint_result.adjusted_contracts
                 logger.info(f"Contracts adjusted: {constraint_result.reason}")
             
-            # Step 8: Check execution quality
+            # Step 9: Check execution quality
             if bid is not None and ask is not None:
                 spread_ticks = self.telemetry.calculate_spread_ticks(bid, ask)
                 execution_check = self.execution_guard.validate_execution(
@@ -218,10 +240,6 @@ class TransmissionOrchestrator:
                     return None
                 
                 signal.notes = f"{signal.notes or ''} | Order type: {execution_check.recommended_order_type}"
-            
-            # Step 9: Final risk check (calculate position size)
-            # Position sizing will be handled by execution engine
-            # For now, signal.contracts is set by strategy (will be adjusted)
             
             logger.info(
                 f"Signal generated: {signal.strategy} {signal.direction} "
