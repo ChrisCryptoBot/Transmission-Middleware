@@ -197,10 +197,11 @@ class TransmissionOrchestrator:
             self.state = SystemState.ANALYZING
             
             # Step 1: Calculate market features
-            features = self.telemetry.calculate(
-                bar_data=bars_15m,
-                news_calendar={},  # TODO: Load from config
-                historical_vwap=None  # TODO: Calculate from historical data
+            features = self.telemetry.calculate_all_features(
+                bars_15m=bars_15m,
+                current_price=current_price,
+                bid=bid,
+                ask=ask
             )
             
             # Step 2: Check risk tripwires
