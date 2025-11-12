@@ -1,0 +1,158 @@
+You've done exceptional planning work here, Chris. The documentation is thorough and well-structured for an AI-assisted build. Let me help you maximize Cursor AI's effectiveness for Transmission.
+
+## Strategic Approach for Cursor AI
+
+### **Phase 1: Foundation Setup (Week 1-2)**
+
+**Best Practice with Cursor:**
+1. **Create a comprehensive `.cursorrules` file** at your project root with:
+   - Your tech stack decisions from T_Stack_Concept.txt
+   - Code style preferences (Python typing, async patterns, naming conventions)
+   - Architecture principles (how modules should interact)
+   - Testing requirements
+
+2. **Start with the "spine" first:**
+   ```
+   transmission/
+   ├── telemetry/        # ADX, VWAP, ATR calculations
+   ├── regime/           # Classifier module
+   ├── risk/             # Governor (-2R day, -5R week)
+   ├── strategies/       # Base interface + implementations
+   └── orchestrator/     # Main transmission loop
+   ```
+
+3. **Use Cursor Composer for module creation:**
+   - Create each module in isolation with clear interfaces
+   - Let Cursor generate the boilerplate with your specifications
+   - Review and refine incrementally
+
+### **Cursor-Specific Tactics**
+
+**For Python Backend:**
+```python
+# Start with this structure - Cursor will understand it well
+# src/telemetry/market_data.py
+
+"""
+Module: Telemetry Engine
+Purpose: Real-time market data processing for regime detection
+Dependencies: pandas, numpy
+Key Functions:
+- calculate_atr(ohlc_data, period=14)
+- calculate_adx(ohlc_data, period=14)  
+- calculate_vwap(ohlc_data)
+"""
+
+# Then use Cursor chat: "Implement these functions with full 
+# type hints, docstrings, and basic error handling"
+```
+
+**For React Dashboard (later):**
+- Give Cursor your UI_Concept.txt context
+- Use shadcn/ui components (Cursor has excellent knowledge of this)
+- Build component-by-component with clear props interfaces
+
+### **Critical Cursor Prompting Strategy**
+
+**DO THIS:**
+```
+"Create the RegimeClassifier class that:
+- Takes ADX, ATR, and VWAP data as inputs
+- Returns 'TREND', 'RANGE', or 'VOLATILE' 
+- Uses thresholds: ADX>25=trend, ADX<20=range, ATR spike=volatile
+- Include full type hints and pytest test file
+- Follow async patterns for real-time processing"
+```
+
+**NOT THIS:**
+```
+"Make a regime classifier"
+```
+
+### **Recommended Build Sequence with Cursor**
+
+**Week 1:**
+1. **Day 1-2:** Project scaffold + telemetry module
+   - Use Cursor to generate project structure
+   - Implement ADX, ATR, VWAP calculators
+   - Create pytest fixtures for market data
+
+2. **Day 3-4:** Regime classifier
+   - Feed it sample data from your tests
+   - Validate classification logic
+   - Create visualization for regime states
+
+3. **Day 5:** Risk governor
+   - Implement -2R daily, -5R weekly limits
+   - Add circuit breaker logic
+   - Test edge cases
+
+**Week 2:**
+1. **User profiler** (constraint collection)
+2. **Base strategy interface** (plugin SDK foundation)
+3. **Integration tests** for Week 1-2 modules
+
+### **Leverage Your Existing Documents**
+
+Create a `docs/` folder in your project and include:
+```
+docs/
+├── product_concept.txt     # Cursor can reference this
+├── architecture.md         # Extract key sections from Product_Concept
+├── api_contracts.md        # Define module interfaces
+└── testing_strategy.md     # pytest approach
+```
+
+**Then in Cursor chat:**
+"Reference docs/architecture.md - implement the RiskGovernor class according to the specification"
+
+### **Specific Commands to Use**
+
+**In Cursor Composer:**
+1. Select multiple files (telemetry + regime modules)
+2. "Refactor these modules to share a common MarketDataProvider interface"
+3. Review the changes, approve/modify
+
+**In Cursor Chat:**
+1. "Generate pytest fixtures for OHLC data with trend, range, and volatile periods"
+2. "Add comprehensive error handling to the telemetry module for missing data"
+3. "Create a simple Streamlit dashboard showing current regime and risk limits"
+
+### **Common Pitfalls to Avoid**
+
+1. **Don't let Cursor over-engineer early**
+   - Start simple, iterate
+   - Use SQLite before PostgreSQL
+   - Streamlit before React
+
+2. **Be specific about async patterns**
+   - Cursor might suggest sync code
+   - Explicitly request "async/await for concurrent broker connections"
+
+3. **Request tests immediately**
+   - "Also generate pytest tests for this module"
+   - Cursor often skips tests unless asked
+
+### **Power Move: Iterative Refinement**
+
+```
+# Iteration 1: "Create basic RegimeClassifier class"
+# Iteration 2: "Add caching for expensive calculations"
+# Iteration 3: "Add logging for regime transitions"
+# Iteration 4: "Optimize for real-time streaming data"
+```
+
+Cursor excels at incremental improvements when you're specific.
+
+### **Week 5 Validation Strategy**
+
+Use Cursor to:
+1. Generate comprehensive test suite
+2. Create load testing scripts
+3. Build debugging dashboard
+4. Analyze performance bottlenecks
+
+**Prompt:** "Analyze the codebase for potential race conditions in async operations"
+
+---
+

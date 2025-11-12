@@ -1,0 +1,45 @@
+# Transmission™ - Adaptive Trading Middleware
+# Core Dependencies
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+pydantic>=2.0.0
+
+# Technical Indicators
+pandas-ta>=0.3.14b0
+# Alternative: ta-lib (requires separate installation)
+
+# Async Operations
+asyncio-compat>=0.1.2
+
+# Database
+sqlalchemy>=2.0.0
+
+# Configuration
+pyyaml>=6.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+
+# Dashboard (MVP - Streamlit)
+streamlit>=1.28.0
+plotly>=5.17.0
+
+# Logging
+loguru>=0.7.0
+
+# Date/Time
+python-dateutil>=2.8.2
+pytz>=2023.3
+
+# Type Hints
+typing-extensions>=4.8.0
+
+# Development Tools
+black>=23.9.0
+ruff>=0.1.0
+mypy>=1.6.0
+

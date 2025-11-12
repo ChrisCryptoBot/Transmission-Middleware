@@ -1,0 +1,67 @@
+# Transmission™ - Economic Calendar
+# Tier-1 events that require trading blackout periods
+
+tier1_events:
+  # Federal Reserve
+  - name: "FOMC Rate Decision"
+    symbol: "FOMC"
+    blackout_minutes_before: 60
+    blackout_minutes_after: 30
+    typical_time: "14:00 ET"
+    
+  - name: "FOMC Minutes"
+    symbol: "FOMC_MINUTES"
+    blackout_minutes_before: 30
+    blackout_minutes_after: 30
+    typical_time: "14:00 ET"
+    
+  - name: "Fed Chair Speech"
+    symbol: "FED_SPEECH"
+    blackout_minutes_before: 30
+    blackout_minutes_after: 30
+    typical_time: "varies"
+    
+  # Economic Data
+  - name: "CPI (Consumer Price Index)"
+    symbol: "CPI"
+    blackout_minutes_before: 30
+    blackout_minutes_after: 30
+    typical_time: "08:30 ET"
+    
+  - name: "NFP (Non-Farm Payrolls)"
+    symbol: "NFP"
+    blackout_minutes_before: 30
+    blackout_minutes_after: 30
+    typical_time: "08:30 ET"
+    
+  - name: "GDP Release"
+    symbol: "GDP"
+    blackout_minutes_before: 30
+    blackout_minutes_after: 30
+    typical_time: "08:30 ET"
+    
+  - name: "PCE (Personal Consumption Expenditures)"
+    symbol: "PCE"
+    blackout_minutes_before: 30
+    blackout_minutes_after: 30
+    typical_time: "08:30 ET"
+    
+  # Earnings (Major Tech - affects MNQ)
+  - name: "AAPL Earnings"
+    symbol: "AAPL_EARNINGS"
+    blackout_minutes_before: 15
+    blackout_minutes_after: 30
+    typical_time: "16:00 ET"
+    
+  - name: "MSFT Earnings"
+    symbol: "MSFT_EARNINGS"
+    blackout_minutes_before: 15
+    blackout_minutes_after: 30
+    typical_time: "16:00 ET"
+    
+  - name: "NVDA Earnings"
+    symbol: "NVDA_EARNINGS"
+    blackout_minutes_before: 15
+    blackout_minutes_after: 30
+    typical_time: "16:00 ET"
+

@@ -1,0 +1,190 @@
+# Transmission™ - Cursor AI Rules & Guidelines
+
+## Tech Stack Decisions
+
+**Backend:**
+- Python 3.11+ with strict type hints
+- pandas, numpy for data processing
+- pandas-ta for technical indicators
+- pydantic for data validation
+- asyncio for concurrent operations
+- SQLite for MVP (PostgreSQL later)
+- pytest for testing
+
+**Frontend (MVP):**
+- Streamlit for dashboard
+- Plotly for visualizations
+
+**Frontend (Production):**
+- React 18+ with TypeScript
+- TailwindCSS + shadcn/ui
+- TanStack Query + Zustand
+
+## Code Style Preferences
+
+**Python:**
+- Use type hints for ALL functions (return types, parameters)
+- Use dataclasses for data structures
+- Follow PEP 8 with 100-character line limit
+- Use async/await for I/O operations (broker connections, data fetching)
+- Use f-strings for string formatting
+- Prefer composition over inheritance
+- Use dependency injection for testability
+
+**Naming Conventions:**
+- Classes: PascalCase (e.g., `RegimeClassifier`)
+- Functions: snake_case (e.g., `calculate_adx`)
+- Constants: UPPER_SNAKE_CASE (e.g., `DEFAULT_ADX_PERIOD`)
+- Private methods: `_leading_underscore`
+
+**Error Handling:**
+- Use specific exceptions (ValueError, TypeError, etc.)
+- Log errors with context using loguru
+- Never silently catch exceptions
+- Return Optional types for functions that can fail
+
+## Architecture Principles
+
+**Module Interaction:**
+- Each module should have a single responsibility
+- Modules communicate via well-defined interfaces (dataclasses, protocols)
+- No circular dependencies
+- Core modules (telemetry, regime) should have no dependencies on higher-level modules
+
+**Async Patterns:**
+- Use async/await for:
+  - Broker API calls
+  - Database operations
+  - WebSocket connections
+  - Concurrent strategy evaluation
+- Use asyncio.gather() for parallel operations
+- Always use async context managers for resources
+
+**Testing Requirements:**
+- Every module must have corresponding test file
+- Use pytest fixtures for common test data
+- Test edge cases (empty data, missing values, boundary conditions)
+- Use pytest-asyncio for async tests
+- Aim for 80%+ code coverage
+
+**Data Validation:**
+- Use pydantic models for all data structures
+- Validate inputs at module boundaries
+- Type check with mypy before committing
+
+## Module Structure
+
+```
+transmission/
+├── telemetry/        # Market data processing (ADX, VWAP, ATR)
+├── regime/           # Regime classification (Trend/Range/Volatile)
+├── risk/             # Risk governor (-2R day, -5R week)
+├── strategies/       # Strategy implementations (VWAP, ORB, etc.)
+├── execution/         # Order management
+├── analytics/        # Journal, metrics, performance tracking
+└── orchestrator/     # Main transmission loop
+```
+
+**Module Rules:**
+- Each module is self-contained
+- Shared utilities go in `transmission/utils/`
+- Config goes in `transmission/config/`
+- Tests mirror source structure
+
+## Documentation Standards
+
+**Docstrings:**
+- Use Google-style docstrings
+- Include Args, Returns, Raises sections
+- Add examples for complex functions
+- Document async behavior explicitly
+
+**Type Hints:**
+- Always include return types
+- Use Optional[X] for nullable values
+- Use Union[X, Y] for multiple types
+- Use Literal for enum-like values
+
+## Testing Strategy
+
+**Unit Tests:**
+- One test file per module
+- Test each public function
+- Use fixtures for common data
+- Mock external dependencies (broker APIs, databases)
+
+**Integration Tests:**
+- Test module interactions
+- Use test database (SQLite in-memory)
+- Test async workflows end-to-end
+
+**Performance Tests:**
+- Profile expensive operations
+- Use pytest-benchmark for timing
+- Optimize hot paths (regime classification, signal generation)
+
+## Common Patterns
+
+**Data Processing:**
+```python
+# Always validate input data
+def calculate_feature(data: pd.DataFrame) -> float:
+    if len(data) < required_bars:
+        raise ValueError(f"Need at least {required_bars} bars")
+    # ... calculation
+```
+
+**Async Operations:**
+```python
+# Use async context managers
+async with broker_connection() as broker:
+    data = await broker.get_market_data()
+```
+
+**Error Handling:**
+```python
+# Log and re-raise or return None
+try:
+    result = expensive_operation()
+except SpecificError as e:
+    logger.error(f"Operation failed: {e}", exc_info=True)
+    return None
+```
+
+## Cursor-Specific Guidelines
+
+**When asking Cursor to generate code:**
+1. Specify exact function signatures with type hints
+2. Request docstrings and tests together
+3. Ask for error handling explicitly
+4. Request async patterns when needed
+5. Ask for pytest fixtures for test data
+
+**Example Good Prompt:**
+"Create a RegimeClassifier class that takes MarketFeatures dataclass as input, returns Literal['TREND', 'RANGE', 'VOLATILE'], uses thresholds ADX>25 for trend, ADX<20 for range, includes full type hints, docstrings, and pytest test file with fixtures for sample market data"
+
+**Example Bad Prompt:**
+"Make a regime classifier"
+
+## Performance Considerations
+
+- Cache expensive calculations (VWAP, ATR over large windows)
+- Use vectorized pandas operations
+- Profile before optimizing
+- Use numba JIT for hot loops if needed
+
+## Security & Safety
+
+- Never log sensitive data (API keys, account numbers)
+- Validate all user inputs
+- Use environment variables for secrets
+- Sanitize file paths
+- Use parameterized queries for database
+
+## Git Workflow
+
+- Commit after each module completion
+- Write descriptive commit messages
+- Keep commits atomic (one feature per commit)
+- Use branches for major features
+
