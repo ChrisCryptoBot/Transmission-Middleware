@@ -436,7 +436,7 @@ def main():
     st.markdown("---")
     st.markdown(
         "<div style='text-align: center; color: rgba(255,255,255,0.5);'>"
-        "Transmission™ - Adaptive Trading Middleware | "
+        "Beyond Candlesticks - Adaptive Trading Middleware | "
         f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         "</div>",
         unsafe_allow_html=True
