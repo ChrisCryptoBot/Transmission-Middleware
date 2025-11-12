@@ -22,6 +22,7 @@ from transmission.telemetry.market_data import Telemetry, MarketFeatures
 from transmission.regime.classifier import RegimeClassifier, RegimeResult
 from transmission.risk.governor import RiskGovernor, TripwireResult
 from transmission.risk.constraint_engine import ConstraintEngine, ValidationResult
+from transmission.risk.position_sizer import PositionSizer
 from transmission.strategies.base import BaseStrategy, Signal, Position
 from transmission.strategies.vwap_pullback import VWAPPullbackStrategy
 from transmission.execution.guard import ExecutionGuard, ExecutionCheck
@@ -84,6 +85,9 @@ class TransmissionOrchestrator:
         
         # Execution
         self.execution_guard = ExecutionGuard()
+        
+        # Position Sizing
+        self.position_sizer = PositionSizer()
         
         # Database
         if database is None:

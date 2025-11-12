@@ -1,15 +1,12 @@
 """
-Risk Module - Risk Management & Prop Firm Compliance
+Risk Management Module
 
-Enforces risk limits:
-- Daily loss limit (-2R)
-- Weekly loss limit (-5R)
-- Prop firm rules (DLL, consistency)
-- Step-down/scale-up logic
+Risk governor, constraint engine, and position sizing.
 """
 
 from transmission.risk.governor import RiskGovernor, TripwireResult, PerformanceMetrics
-from transmission.risk.constraint_engine import ConstraintEngine, ValidationResult, UserProfile
+from transmission.risk.constraint_engine import ConstraintEngine, ValidationResult
+from transmission.risk.position_sizer import PositionSizer
 
 __all__ = [
     'RiskGovernor',
@@ -17,5 +14,5 @@ __all__ = [
     'PerformanceMetrics',
     'ConstraintEngine',
     'ValidationResult',
-    'UserProfile'
+    'PositionSizer'
 ]
