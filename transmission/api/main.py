@@ -31,8 +31,14 @@ app = FastAPI(
 )
 
 # CORS configuration (environment-based)
-cors_origins = os.getenv("CORS_ORIGINS", "*").split(",")
-if cors_origins == ["*"]:
+# Default includes Vite dev server (5173) and common production ports
+default_origins = ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"]
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+cors_origins = cors_origins_env.split(",") if cors_origins_env else default_origins
+
+# Allow all in development if explicitly set
+if "*" in cors_origins or (not cors_origins_env and os.getenv("ENV") != "production"):
+    cors_origins = ["*"]
     logger.warning("CORS is set to allow all origins. Configure CORS_ORIGINS for production.")
 
 app.add_middleware(
