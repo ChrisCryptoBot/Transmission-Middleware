@@ -49,13 +49,12 @@ async def get_system_status(
 
 
 @router.get("/risk", response_model=RiskStatusResponse)
-async def get_risk_status():
+async def get_risk_status(
+    orch: TransmissionOrchestrator = Depends(get_orchestrator)
+):
     """Get current risk status"""
     try:
-        if orchestrator is None:
-            raise HTTPException(status_code=503, detail="System not initialized")
-        
-        tripwire = orchestrator.risk_governor.check_tripwires()
+        tripwire = orch.risk_governor.check_tripwires()
         
         return RiskStatusResponse(
             can_trade=tripwire.can_trade,
@@ -64,10 +63,10 @@ async def get_risk_status():
             daily_pnl_r=tripwire.daily_pnl_r,
             weekly_pnl_r=tripwire.weekly_pnl_r,
             consecutive_red_days=tripwire.consecutive_red_days,
-            current_r=orchestrator.risk_governor.get_current_r()
+            current_r=orch.risk_governor.get_current_r()
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting risk status: {str(e)}")
+        raise InternalServerError(f"Error getting risk status: {str(e)}")
 
 
 @router.get("/health")
