@@ -16,8 +16,8 @@ from transmission.orchestrator.transmission import TransmissionOrchestrator, Sys
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Transmission™ API",
-    description="Adaptive Trading Middleware API",
+    title="Beyond Candlesticks",
+    description="Adaptive Trading Middleware - Transmission™ API",
     version="0.1.0"
 )
 
