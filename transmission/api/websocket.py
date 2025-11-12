@@ -143,3 +143,40 @@ def broadcast_trade_execution(trade: dict):
         "timestamp": datetime.now().isoformat()
     })
 
+
+def broadcast_rejection(rejection_type: str, reason: str):
+    """Broadcast rejection event (constraint violation or guard reject)"""
+    manager.broadcast({
+        "type": rejection_type,
+        "reason": reason,
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+def broadcast_order_submitted(order_id: str, signal: dict):
+    """Broadcast order submitted event"""
+    manager.broadcast({
+        "type": "order_submitted",
+        "order_id": order_id,
+        "signal": signal,
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+def broadcast_fill(fill: dict):
+    """Broadcast fill event"""
+    manager.broadcast({
+        "type": "fill",
+        "fill": fill,
+        "timestamp": datetime.now().isoformat()
+    })
+
+
+def broadcast_flatten_all(reason: str):
+    """Broadcast flatten all event"""
+    manager.broadcast({
+        "type": "flatten_all",
+        "reason": reason,
+        "timestamp": datetime.now().isoformat()
+    })
+

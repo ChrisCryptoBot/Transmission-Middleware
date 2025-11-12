@@ -366,6 +366,72 @@ def main():
             reason = risk_status.get("reason", "All systems operational")
             st.info(f"**Status:** {reason}")
     
+    st.divider()
+    
+    # Kill Switch / Flatten All
+    st.markdown("## 🔴 Emergency Controls")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔴 Flatten All / Kill Switch", type="primary", use_container_width=True):
+            try:
+                response = requests.post(
+                    f"{API_BASE_URL}/api/system/flatten_all",
+                    json={"reason": "manual_button"},
+                    timeout=2
+                )
+                if response.status_code == 200:
+                    st.success("✅ All positions flattened successfully")
+                else:
+                    st.error(f"❌ Error: {response.text}")
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
+    
+    with col2:
+        if st.button("🔄 Refresh Data", use_container_width=True):
+            st.rerun()
+    
+    st.divider()
+    
+    # Open Orders
+    st.markdown("## 📋 Open Orders")
+    try:
+        orders_response = requests.get(f"{API_BASE_URL}/api/system/orders", timeout=2)
+        if orders_response.status_code == 200:
+            orders_data = orders_response.json()
+            orders = orders_data.get("orders", [])
+            
+            if orders:
+                df_orders = pd.DataFrame(orders)
+                st.dataframe(df_orders, use_container_width=True, hide_index=True)
+            else:
+                st.info("No open orders")
+        else:
+            st.warning("Could not fetch orders")
+    except Exception as e:
+        st.warning(f"Error fetching orders: {e}")
+    
+    st.divider()
+    
+    # Positions
+    st.markdown("## 📊 Active Positions")
+    try:
+        positions_response = requests.get(f"{API_BASE_URL}/api/system/positions", timeout=2)
+        if positions_response.status_code == 200:
+            positions_data = positions_response.json()
+            positions = positions_data.get("positions", [])
+            
+            if positions:
+                df_positions = pd.DataFrame(positions)
+                st.dataframe(df_positions, use_container_width=True, hide_index=True)
+            else:
+                st.info("No active positions")
+        else:
+            st.warning("Could not fetch positions")
+    except Exception as e:
+        st.warning(f"Error fetching positions: {e}")
+    
     # Footer
     st.markdown("---")
     st.markdown(

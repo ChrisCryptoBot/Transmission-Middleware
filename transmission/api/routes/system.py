@@ -88,3 +88,52 @@ async def health_check():
             "error": str(e)
         }
 
+
+@router.post("/flatten_all")
+async def flatten_all(payload: dict):
+    """
+    Flatten all positions (kill switch).
+    
+    Body:
+        reason: Optional reason for flattening
+    """
+    try:
+        if orchestrator is None:
+            raise HTTPException(status_code=503, detail="System not initialized")
+        
+        reason = payload.get("reason", "manual_button")
+        orchestrator.flatten_all_manual(reason)
+        
+        return {
+            "status": "ok",
+            "message": f"All positions flattened: {reason}"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error flattening positions: {str(e)}")
+
+
+@router.get("/orders")
+async def get_open_orders():
+    """Get all open orders"""
+    try:
+        if orchestrator is None:
+            raise HTTPException(status_code=503, detail="System not initialized")
+        
+        orders = orchestrator.get_open_orders()
+        return {"orders": orders, "count": len(orders)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching orders: {str(e)}")
+
+
+@router.get("/positions")
+async def get_positions():
+    """Get all active positions"""
+    try:
+        if orchestrator is None:
+            raise HTTPException(status_code=503, detail="System not initialized")
+        
+        positions = orchestrator.get_positions()
+        return {"positions": positions, "count": len(positions)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching positions: {str(e)}")
+

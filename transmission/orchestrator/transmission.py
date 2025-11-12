@@ -21,12 +21,16 @@ from loguru import logger
 from transmission.telemetry.market_data import Telemetry, MarketFeatures
 from transmission.regime.classifier import RegimeClassifier, RegimeResult
 from transmission.risk.governor import RiskGovernor, TripwireResult
-from transmission.risk.constraint_engine import ConstraintEngine, ValidationResult
+from transmission.risk.smart_constraints import SmartConstraintEngine
 from transmission.risk.position_sizer import PositionSizer
 from transmission.strategies.base import BaseStrategy, Signal, Position
 from transmission.strategies.vwap_pullback import VWAPPullbackStrategy
 from transmission.execution.guard import ExecutionGuard, ExecutionCheck
+from transmission.execution.engine import ExecutionEngine
+from transmission.execution.adapter import BrokerAdapter
+from transmission.execution.mock_broker import MockBrokerAdapter
 from transmission.database import Database
+from transmission.config.config_loader import ConfigLoader
 
 
 class SystemState(Enum):
@@ -58,18 +62,43 @@ class TransmissionOrchestrator:
     def __init__(
         self,
         risk_governor: Optional[RiskGovernor] = None,
-        constraint_engine: Optional[ConstraintEngine] = None,
+        constraint_engine: Optional[SmartConstraintEngine] = None,
         db_path: Optional[str] = None,
-        database: Optional[Database] = None
+        database: Optional[Database] = None,
+        broker: Optional[BrokerAdapter] = None,
+        config: Optional[Dict] = None
     ):
         """
         Initialize Transmission Orchestrator.
         
         Args:
             risk_governor: RiskGovernor instance (creates default if None)
-            constraint_engine: ConstraintEngine instance (creates default if None)
+            constraint_engine: SmartConstraintEngine instance (creates default if None)
             db_path: Path to SQLite database for state
+            database: Database instance (creates default if None)
+            broker: Broker adapter (creates mock if None)
+            config: Configuration dict (loads from files if None)
         """
+        # Load configuration
+        if config is None:
+            config = {}
+            broker_config = ConfigLoader.load_broker_config()
+            constraints_config = ConfigLoader.load_constraints_config()
+            config['broker'] = broker_config.get('broker', {})
+            config['execution'] = broker_config.get('execution', {})
+            config['constraints'] = constraints_config.get('constraints', {})
+        
+        # Validate constraints at boot
+        constraints_config = {'constraints': config.get('constraints', {})}
+        is_valid, violations = ConfigLoader.validate_constraints(constraints_config)
+        if not is_valid:
+            error_msg = "Constraint validation failed:\n" + "\n".join(f"  - {v}" for v in violations)
+            logger.error(error_msg)
+            raise ValueError(f"Invalid constraints: {error_msg}")
+        
+        # Log effective values
+        ConfigLoader.log_effective_values(constraints_config)
+        
         # Core modules
         self.telemetry = Telemetry(tick_size=0.25)
         self.regime_classifier = RegimeClassifier()
@@ -80,10 +109,11 @@ class TransmissionOrchestrator:
         self.risk_governor = risk_governor
         
         if constraint_engine is None:
-            constraint_engine = ConstraintEngine()
+            constraint_engine = SmartConstraintEngine()
         self.constraint_engine = constraint_engine
         
         # Execution
+        guard_mode = config.get('execution', {}).get('guard_mode', 'strict')
         self.execution_guard = ExecutionGuard()
         
         # Position Sizing
@@ -93,6 +123,28 @@ class TransmissionOrchestrator:
         if database is None:
             database = Database(db_path=db_path)
         self.database = database
+        
+        # Broker & Execution Engine
+        if broker is None:
+            # Create broker adapter based on config
+            broker_mode = config.get('broker', {}).get('mode', 'mock')
+            if broker_mode == 'mock':
+                mock_config = config.get('broker', {}).get('mock', {})
+                broker = MockBrokerAdapter(
+                    slippage_ticks=mock_config.get('slippage_ticks', 0.5),
+                    latency_ms=mock_config.get('latency_ms', 50.0),
+                    fill_probability=mock_config.get('fill_probability', 1.0)
+                )
+            else:
+                # TODO: Add paper/live broker adapters
+                broker = MockBrokerAdapter()
+        
+        self.broker = broker
+        self.execution_engine = ExecutionEngine(
+            broker=self.broker,
+            database=self.database,
+            guard=self.execution_guard
+        )
         
         # Strategies
         self.strategies: Dict[str, BaseStrategy] = {
