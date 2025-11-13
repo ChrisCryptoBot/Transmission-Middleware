@@ -361,7 +361,201 @@ class TransmissionOrchestrator:
             logger.error(f"Error in process_bar: {e}", exc_info=True)
             self.state = SystemState.ERROR
             return None
-    
+
+    async def process_signal(self, signal: Signal) -> Dict:
+        """
+        Process external signal (from webhooks or API).
+
+        Simplified version for MVP - skips full market data fetching.
+        Trusts signal source for entry/stop/target prices.
+
+        Args:
+            signal: Signal object with symbol, direction, entry, stop, target
+
+        Returns:
+            Dict with status, action, reason, and execution details
+        """
+        try:
+            logger.info(f"Processing external signal: {signal.strategy} {signal.direction} on {signal.symbol}")
+
+            # Step 1: Mental State Check
+            mental_result = self.mental_governor.evaluate()
+            if mental_result.current_state == MentalState.BLOCKED:
+                logger.warning(f"Signal blocked by Mental Governor: {mental_result.reason}")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": f"Mental state: {mental_result.current_state.value} - {mental_result.reason}",
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
+
+            # Step 2: News Blackout Check
+            if self.news_flat.is_blackout(signal.symbol):
+                logger.warning(f"Signal blocked by News Blackout: {signal.symbol}")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": "News blackout active",
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
+
+            # Step 3: Risk Tripwire Check
+            tripwire = self.risk_governor.check_tripwires()
+            if not tripwire.can_trade:
+                logger.warning(f"Signal blocked by Risk Governor: {tripwire.reason}")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": tripwire.reason,
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
+
+            # Step 4: Position Sizing (Simplified)
+            # Use signal's entry and stop to calculate risk
+            risk_dollars = self.risk_governor.get_current_r()
+            stop_distance_points = abs(signal.entry_price - signal.stop_price)
+
+            # Apply mental state multiplier
+            risk_dollars *= mental_result.size_multiplier
+
+            # Calculate contracts (simplified - no ATR normalization for webhook signals)
+            if stop_distance_points > 0:
+                contracts = int(risk_dollars / stop_distance_points)
+            else:
+                logger.warning("Signal has zero stop distance - rejecting")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": "Invalid stop distance (zero)",
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
+
+            if contracts < 1:
+                logger.info(f"Position too small after sizing: {contracts}")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": "Position size < 1 contract after sizing",
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
+
+            # Update signal with calculated position size
+            signal.contracts = contracts
+
+            # Step 5: Constraint Validation (Simplified)
+            # Get current bid/ask from broker
+            bid, ask = self.broker.get_bid_ask(signal.symbol)
+            spread_ticks = (ask - bid) / 0.25  # Assuming tick size = 0.25
+
+            # DLL constraint
+            dll_constraint = self.constraint_engine.get_dll_constraint()
+
+            constraint_result = self.constraint_engine.validate_trade(
+                symbol=signal.symbol,
+                risk_dollars=risk_dollars,
+                spread_ticks=spread_ticks,
+                estimated_slippage_ticks=1.0,  # Default estimate for webhooks
+                news_proximity_min=999,  # News already checked above
+                mental_state=mental_result.current_state.value,
+                account_equity=None,
+                dll_remaining=dll_constraint
+            )
+
+            if not constraint_result.approved:
+                logger.warning(f"Signal blocked by constraints: {constraint_result.reason}")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": constraint_result.reason,
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
+
+            # Step 6: Execution Guard
+            execution_check = self.execution_guard.validate_execution(
+                spread_ticks=spread_ticks,
+                order_size=signal.contracts
+            )
+
+            if not execution_check.approved:
+                logger.warning(f"Signal blocked by Execution Guard: {execution_check.reason}")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": execution_check.reason,
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
+
+            # Step 7: Execute Trade
+            order_id = self.execution_engine.place_signal(
+                signal=signal,
+                qty=float(signal.contracts)
+            )
+
+            if order_id is None:
+                logger.error("Order submission failed")
+                return {
+                    "status": "error",
+                    "action": "ERROR",
+                    "reason": "Order execution failed",
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
+
+            # Step 8: Log and Broadcast
+            self.database.save_system_state(
+                system_state="order_submitted",
+                current_regime=signal.regime,
+                active_strategy=signal.strategy
+            )
+            self._broadcast_order_submitted(order_id, signal)
+
+            logger.info(
+                f"Signal executed: {signal.strategy} {signal.direction} "
+                f"{signal.contracts} contracts @ {signal.entry_price:.2f} "
+                f"(order_id: {order_id})"
+            )
+
+            # Return success response
+            return {
+                "status": "processed",
+                "action": "TRADE",
+                "reason": "Signal approved and executed",
+                "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                "order_id": order_id,
+                "symbol": signal.symbol,
+                "direction": signal.direction,
+                "contracts": signal.contracts,
+                "entry_price": signal.entry_price,
+                "stop_price": signal.stop_price,
+                "target_price": signal.target_price
+            }
+
+        except Exception as e:
+            logger.error(f"Error in process_signal: {e}", exc_info=True)
+            return {
+                "status": "error",
+                "action": "ERROR",
+                "reason": f"Internal error: {str(e)}",
+                "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                "symbol": signal.symbol if hasattr(signal, 'symbol') else "UNKNOWN",
+                "direction": signal.direction if hasattr(signal, 'direction') else "UNKNOWN"
+            }
+
     def _select_strategy(self, regime: str) -> Optional[BaseStrategy]:
         """
         Select strategy based on regime.

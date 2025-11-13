@@ -89,16 +89,15 @@ async def tradingview_webhook(
         # Log webhook received
         logger.info(f"TradingView webhook received from user {user.user_id}: {signal.strategy} {signal.direction} on {alert.get('ticker')}")
 
-        # TODO: Process signal through orchestrator
-        # For now, just acknowledge receipt
-        # In next step, we'll connect this to orchestrator.process_signal()
+        # Process signal through orchestrator
+        result = await orchestrator.process_signal(signal)
 
         return WebhookResponse(
-            status="received",
-            signal_id=f"tv_{int(datetime.now().timestamp())}",
-            reason="Signal received and queued for processing",
+            status=result["status"],
+            signal_id=result.get("signal_id"),
+            reason=result.get("reason"),
             timestamp=datetime.now(),
-            message=f"TradingView {signal.direction} signal for {alert.get('ticker')} acknowledged"
+            message=f"TradingView {signal.direction} signal for {alert.get('ticker')} {result['action'].lower()}"
         )
 
     except ValueError as e:
@@ -175,15 +174,15 @@ async def mt5_webhook(
         # Log webhook received
         logger.info(f"MT5 webhook received from user {user.user_id}: {parsed_signal.strategy} {parsed_signal.direction} on {signal.get('symbol')}")
 
-        # TODO: Process signal through orchestrator
-        # For now, just acknowledge receipt
+        # Process signal through orchestrator
+        result = await orchestrator.process_signal(parsed_signal)
 
         return WebhookResponse(
-            status="received",
-            signal_id=f"mt5_{int(datetime.now().timestamp())}",
-            reason="Signal received and queued for processing",
+            status=result["status"],
+            signal_id=result.get("signal_id"),
+            reason=result.get("reason"),
             timestamp=datetime.now(),
-            message=f"MT5 {parsed_signal.direction} signal for {signal.get('symbol')} acknowledged"
+            message=f"MT5 {parsed_signal.direction} signal for {signal.get('symbol')} {result['action'].lower()}"
         )
 
     except ValueError as e:
@@ -266,15 +265,15 @@ async def generic_webhook(
         # Log webhook received
         logger.info(f"Generic webhook received from user {user.user_id}: {parsed_signal.strategy} {parsed_signal.direction} on {signal.get('symbol')}")
 
-        # TODO: Process signal through orchestrator
-        # For now, just acknowledge receipt
+        # Process signal through orchestrator
+        result = await orchestrator.process_signal(parsed_signal)
 
         return WebhookResponse(
-            status="received",
-            signal_id=f"generic_{int(datetime.now().timestamp())}",
-            reason="Signal received and queued for processing",
+            status=result["status"],
+            signal_id=result.get("signal_id"),
+            reason=result.get("reason"),
             timestamp=datetime.now(),
-            message=f"Generic {parsed_signal.direction} signal for {signal.get('symbol')} acknowledged"
+            message=f"Generic {parsed_signal.direction} signal for {signal.get('symbol')} {result['action'].lower()}"
         )
 
     except ValueError as e:
