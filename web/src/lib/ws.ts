@@ -11,7 +11,7 @@ export function useWebSocket(path = '/ws') {
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<number | null>(null);
 
   const connect = useCallback(() => {
     // Use Vite proxy for WebSocket (relative path)
@@ -53,7 +53,7 @@ export function useWebSocket(path = '/ws') {
         // Only reconnect if not a normal closure and attempts remain
         if (event.code !== 1000 && reconnectAttempts < 5) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
-          reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectTimeoutRef.current = window.setTimeout(() => {
             setReconnectAttempts((prev) => prev + 1);
             connect();
           }, delay);
@@ -72,7 +72,7 @@ export function useWebSocket(path = '/ws') {
 
     return () => {
       if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
+        window.clearTimeout(reconnectTimeoutRef.current);
       }
       if (wsRef.current) {
         wsRef.current.close();
