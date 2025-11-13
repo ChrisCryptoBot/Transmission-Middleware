@@ -6,6 +6,7 @@ import { StatusCard } from '@/components/StatusCard';
 import { KillSwitch } from '@/components/KillSwitch';
 import { OrdersTable } from '@/components/OrdersTable';
 import { PositionsTable } from '@/components/PositionsTable';
+import { ManualSignalForm } from '@/components/ManualSignalForm';
 import { useEffect } from 'react';
 import { WSEvent } from '@/lib/types';
 
@@ -107,6 +108,11 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <OrdersTable orders={ordersData?.orders || []} isLoading={ordersLoading} />
         <PositionsTable positions={positionsData?.positions || []} isLoading={positionsLoading} />
+      </div>
+
+      {/* Manual Signal Submission Section */}
+      <div className="mt-8">
+        <ManualSignalForm />
       </div>
     </div>
   );
