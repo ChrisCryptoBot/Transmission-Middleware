@@ -59,16 +59,18 @@ class VWAPPullbackStrategy(BaseStrategy):
         self,
         features: MarketFeatures,
         regime: str,
-        current_positions: List[Position]
+        current_positions: List[Position],
+        symbol: str = "MNQ"
     ) -> Optional[Signal]:
         """
         Generate VWAP Pullback signal.
-        
+
         Args:
             features: MarketFeatures with indicators
             regime: Current market regime
             current_positions: Currently open positions
-            
+            symbol: Trading symbol (default: "MNQ")
+
         Returns:
             Signal if setup found, None otherwise
         """
@@ -87,20 +89,20 @@ class VWAPPullbackStrategy(BaseStrategy):
         # Determine direction based on VWAP slope
         # Positive slope = uptrend (long), negative slope = downtrend (short)
         vwap_slope_positive = features.vwap_slope_abs > features.vwap_slope_median_20d
-        
+
         if vwap_slope_positive:
             # Uptrend - look for long entry
-            signal = self._check_long_entry(features)
+            signal = self._check_long_entry(features, symbol)
         else:
             # Downtrend - look for short entry
-            signal = self._check_short_entry(features)
-        
+            signal = self._check_short_entry(features, symbol)
+
         return signal
     
-    def _check_long_entry(self, features: MarketFeatures) -> Optional[Signal]:
+    def _check_long_entry(self, features: MarketFeatures, symbol: str) -> Optional[Signal]:
         """
         Check for long entry on VWAP pullback.
-        
+
         Entry conditions:
         - Price is at or below VWAP (pullback)
         - Price is within threshold distance of VWAP
@@ -135,8 +137,9 @@ class VWAPPullbackStrategy(BaseStrategy):
             setup_quality += 0.1  # Close to VWAP
         
         confidence = self.calculate_confidence(features, setup_quality)
-        
+
         return Signal(
+            symbol=symbol,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
@@ -149,10 +152,10 @@ class VWAPPullbackStrategy(BaseStrategy):
             notes=f"VWAP pullback, ADX={features.adx_14:.1f}, distance={distance_pct:.2f}%"
         )
     
-    def _check_short_entry(self, features: MarketFeatures) -> Optional[Signal]:
+    def _check_short_entry(self, features: MarketFeatures, symbol: str) -> Optional[Signal]:
         """
         Check for short entry on VWAP pullback.
-        
+
         Entry conditions:
         - Price is at or above VWAP (pullback in downtrend)
         - Price is within threshold distance of VWAP
@@ -187,8 +190,9 @@ class VWAPPullbackStrategy(BaseStrategy):
             setup_quality += 0.1
         
         confidence = self.calculate_confidence(features, setup_quality)
-        
+
         return Signal(
+            symbol=symbol,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
