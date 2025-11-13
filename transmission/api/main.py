@@ -14,11 +14,12 @@ import os
 from datetime import datetime
 
 from transmission.api.routes import trades, metrics, system, signals, auth, webhooks
-from transmission.api.websocket import websocket_endpoint, set_orchestrator as set_ws_orchestrator
+from transmission.api.websocket import websocket_endpoint, set_orchestrator as set_ws_orchestrator, manager as ws_manager
 from transmission.api.dependencies import set_orchestrator as set_dep_orchestrator
 from transmission.api.middleware import LoggingMiddleware, SecurityHeadersMiddleware
 from transmission.api.exceptions import APIException
 from transmission.orchestrator.transmission import TransmissionOrchestrator, SystemState
+from transmission.orchestrator.gear_state import set_websocket_manager
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -83,7 +84,10 @@ async def startup_event():
         signals.set_orchestrator(orchestrator)
         set_ws_orchestrator(orchestrator)
         set_dep_orchestrator(orchestrator)
-        
+
+        # Set WebSocket manager in gear state machine
+        set_websocket_manager(ws_manager)
+
         logger.info("Transmission API ready")
     except Exception as e:
         logger.error(f"Failed to initialize orchestrator: {e}")

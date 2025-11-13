@@ -26,6 +26,16 @@ from dataclasses import dataclass
 from loguru import logger
 
 
+# WebSocket manager (imported globally, set from orchestrator)
+websocket_manager = None
+
+
+def set_websocket_manager(manager):
+    """Set the WebSocket manager instance"""
+    global websocket_manager
+    websocket_manager = manager
+
+
 class GearState(Enum):
     """
     Transmission gear states.
@@ -254,6 +264,23 @@ class GearStateMachine:
                     )
                 except Exception as e:
                     logger.error(f"Failed to log gear shift to database: {e}")
+
+            # Broadcast gear change via WebSocket
+            if websocket_manager:
+                try:
+                    from transmission.api.websocket import broadcast_gear_change
+                    broadcast_gear_change(
+                        from_gear=self.current_gear.value,
+                        to_gear=new_gear.value,
+                        reason=reason,
+                        context={
+                            'daily_r': context.daily_r,
+                            'weekly_r': context.weekly_r,
+                            'consecutive_losses': context.consecutive_losses,
+                        }
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to broadcast gear change via WebSocket: {e}")
 
             self.current_gear = new_gear
             self.shift_history.append(shift)
