@@ -11,6 +11,7 @@ import math
 from typing import Optional
 from loguru import logger
 import numpy as np
+from transmission.config.instrument_specs import InstrumentSpecService
 
 
 class PositionSizer:
@@ -22,11 +23,12 @@ class PositionSizer:
     - Prop firm DLL constraints (max 10% of DLL per trade)
     - Mental state adjustments
     - Minimum position validation
+    - Multi-asset support via InstrumentSpecService
     """
     
     def __init__(
         self,
-        point_value: float = 2.0,  # $2 per point for MNQ
+        instrument_spec_service: Optional[InstrumentSpecService] = None,
         min_contracts: int = 1,
         max_risk_pct: float = 0.02,  # 2% max risk per trade
         dll_risk_pct: float = 0.10  # 10% of DLL max per trade
@@ -35,18 +37,19 @@ class PositionSizer:
         Initialize Position Sizer.
         
         Args:
-            point_value: Dollar value per point (default $2 for MNQ)
+            instrument_spec_service: InstrumentSpecService instance (creates default if None)
             min_contracts: Minimum contracts to trade (default 1)
             max_risk_pct: Maximum risk as % of account (default 2%)
             dll_risk_pct: Max risk as % of DLL (default 10%)
         """
-        self.point_value = point_value
+        self.instrument_spec = instrument_spec_service or InstrumentSpecService()
         self.min_contracts = min_contracts
         self.max_risk_pct = max_risk_pct
         self.dll_risk_pct = dll_risk_pct
     
     def calculate_contracts(
         self,
+        symbol: str,  # ADD THIS PARAMETER
         risk_dollars: float,
         stop_points: float,
         atr_current: float,
@@ -117,8 +120,11 @@ class PositionSizer:
             logger.debug(f"Account balance constraint: max risk ${max_account_risk:.2f}")
         
         # Step 5: Calculate contracts
+        # Get instrument-specific point value
+        point_value = self.instrument_spec.get_point_value(symbol)
+        
         # contracts = floor(adjusted_risk / (stop_points × point_value))
-        risk_per_contract = stop_points * self.point_value
+        risk_per_contract = stop_points * point_value
         if risk_per_contract <= 0:
             logger.warning("Risk per contract must be positive")
             return 0
@@ -141,6 +147,7 @@ class PositionSizer:
     
     def validate_position_size(
         self,
+        symbol: str,  # ADD THIS PARAMETER
         contracts: int,
         stop_points: float,
         account_balance: float,
@@ -165,7 +172,8 @@ class PositionSizer:
             return False, f"Position too small: {contracts} < {self.min_contracts} minimum"
         
         # Calculate risk per contract
-        risk_per_contract = stop_points * self.point_value
+        point_value = self.instrument_spec.get_point_value(symbol)
+        risk_per_contract = stop_points * point_value
         total_risk = contracts * risk_per_contract
         
         # Check against account balance
@@ -204,6 +212,7 @@ class PositionSizer:
     
     def calculate_risk_dollars(
         self,
+        symbol: str,  # ADD THIS PARAMETER
         contracts: int,
         stop_points: float
     ) -> float:
@@ -211,11 +220,13 @@ class PositionSizer:
         Calculate risk in dollars for given position.
         
         Args:
+            symbol: Trading symbol (e.g., "MNQ", "ES")
             contracts: Number of contracts
             stop_points: Stop distance in points
             
         Returns:
             Risk in dollars
         """
-        return contracts * stop_points * self.point_value
+        point_value = self.instrument_spec.get_point_value(symbol)
+        return contracts * stop_points * point_value
 

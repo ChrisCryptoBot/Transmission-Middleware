@@ -162,8 +162,12 @@ class TradingViewAdapter(SignalAdapter):
         # Contracts (default 1, will be adjusted by Position Sizer)
         contracts = raw_signal.get("contracts", 1)
 
+        # Infer asset class
+        asset_class = self.infer_asset_class(symbol)
+
         return Signal(
             symbol=symbol,
+            asset_class=asset_class,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
@@ -250,8 +254,12 @@ class MT5Adapter(SignalAdapter):
         # Confidence (MT5 signals are medium confidence)
         confidence = 0.75
 
+        # Infer asset class
+        asset_class = self.infer_asset_class(symbol)
+
         return Signal(
             symbol=symbol,
+            asset_class=asset_class,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
@@ -331,8 +339,14 @@ class GenericWebhookAdapter(SignalAdapter):
         strategy = raw_signal.get("strategy", "Generic")
         notes = raw_signal.get("notes", "Generic webhook signal")
 
+        # Get asset class (allow override, otherwise infer)
+        asset_class = raw_signal.get("asset_class")
+        if not asset_class:
+            asset_class = self.infer_asset_class(symbol)
+
         return Signal(
             symbol=symbol,
+            asset_class=asset_class,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,

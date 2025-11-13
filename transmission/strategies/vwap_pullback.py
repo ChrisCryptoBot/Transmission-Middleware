@@ -11,6 +11,7 @@ from typing import Optional, List
 from datetime import datetime
 from transmission.strategies.base import BaseStrategy, Signal, Position
 from transmission.telemetry.market_data import MarketFeatures
+from transmission.config.instrument_specs import InstrumentSpecService
 
 
 class VWAPPullbackStrategy(BaseStrategy):
@@ -31,7 +32,8 @@ class VWAPPullbackStrategy(BaseStrategy):
         self,
         risk_reward_ratio: float = 2.0,
         vwap_distance_threshold: float = 0.5,  # % distance from VWAP
-        min_adx: float = 25.0
+        min_adx: float = 25.0,
+        symbol: str = "MNQ"  # Default symbol
     ):
         """
         Initialize VWAP Pullback Strategy.
@@ -40,10 +42,13 @@ class VWAPPullbackStrategy(BaseStrategy):
             risk_reward_ratio: Target risk:reward (default 2:1)
             vwap_distance_threshold: Maximum % distance from VWAP for entry (default 0.5%)
             min_adx: Minimum ADX for trend confirmation (default 25)
+            symbol: Trading symbol (default "MNQ")
         """
         self.risk_reward_ratio = risk_reward_ratio
         self.vwap_distance_threshold = vwap_distance_threshold
         self.min_adx = min_adx
+        self.symbol = symbol
+        self.instrument_spec = InstrumentSpecService()
     
     @property
     def required_regime(self) -> str:
@@ -138,8 +143,12 @@ class VWAPPullbackStrategy(BaseStrategy):
         
         confidence = self.calculate_confidence(features, setup_quality)
 
+        # Get asset class from instrument spec
+        asset_class = self.instrument_spec.get_asset_class(symbol)
+        
         return Signal(
             symbol=symbol,
+            asset_class=asset_class,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
@@ -191,8 +200,12 @@ class VWAPPullbackStrategy(BaseStrategy):
         
         confidence = self.calculate_confidence(features, setup_quality)
 
+        # Get asset class from instrument spec
+        asset_class = self.instrument_spec.get_asset_class(symbol)
+        
         return Signal(
             symbol=symbol,
+            asset_class=asset_class,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,

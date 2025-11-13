@@ -36,6 +36,7 @@ from transmission.risk.news_flat import NewsFlat
 from transmission.analytics.journal_analytics import JournalAnalytics
 from transmission.database import Database
 from transmission.config.config_loader import ConfigLoader
+from transmission.config.instrument_specs import InstrumentSpecService
 from datetime import datetime
 
 
@@ -72,7 +73,8 @@ class TransmissionOrchestrator:
         db_path: Optional[str] = None,
         database: Optional[Database] = None,
         broker: Optional[BrokerAdapter] = None,
-        config: Optional[Dict] = None
+        config: Optional[Dict] = None,
+        instrument_spec_service: Optional[InstrumentSpecService] = None
     ):
         """
         Initialize Transmission Orchestrator.
@@ -105,8 +107,12 @@ class TransmissionOrchestrator:
         # Log effective values
         ConfigLoader.log_effective_values(constraints_config)
         
+        # Instrument specifications (multi-asset support)
+        self.instrument_spec = instrument_spec_service or InstrumentSpecService()
+        
         # Core modules
-        self.telemetry = Telemetry(tick_size=0.25)
+        # Note: Telemetry tick_size will be looked up per symbol when needed
+        self.telemetry = Telemetry(tick_size=0.25)  # Default, will use instrument_spec per symbol
         self.regime_classifier = RegimeClassifier()
         
         # Risk management
@@ -122,11 +128,14 @@ class TransmissionOrchestrator:
         guard_mode = config.get('execution', {}).get('guard_mode', 'strict')
         self.execution_guard = ExecutionGuard()
         
-        # Position Sizing
-        self.position_sizer = PositionSizer()
+        # Position Sizing (with instrument spec service)
+        self.position_sizer = PositionSizer(
+            instrument_spec_service=self.instrument_spec
+        )
         
         # New modules
-        self.in_trade_manager = InTradeManager(tick_size=0.25)
+        # Note: InTradeManager tick_size will be looked up per symbol when needed
+        self.in_trade_manager = InTradeManager(tick_size=0.25)  # Default, will use instrument_spec per symbol
         self.multi_tf_fusion = MultiTimeframeFusion(
             ltf_interval="1m",
             htf_intervals=["15m", "1h"],
@@ -246,10 +255,14 @@ class TransmissionOrchestrator:
             self.current_strategy = strategy
             
             # Step 9: Generate signal
+            # TODO: Get symbol from config or signal context - for now default to MNQ
+            # In production, this should come from market data source or config
+            symbol = "MNQ"  # Default - will be made configurable
             signal = strategy.generate_signal(
                 features=features,
                 regime=regime_result.regime,
-                current_positions=self.current_positions
+                current_positions=self.current_positions,
+                symbol=symbol  # ADD THIS
             )
             
             if signal is None:
@@ -270,6 +283,7 @@ class TransmissionOrchestrator:
             
             # Calculate contracts with ATR normalization
             contracts = self.position_sizer.calculate_contracts(
+                symbol=signal.symbol,  # ADD THIS
                 risk_dollars=risk_dollars,
                 stop_points=stop_distance_points,
                 atr_current=features.atr_14,
@@ -424,19 +438,34 @@ class TransmissionOrchestrator:
             # Apply mental state multiplier
             risk_dollars *= mental_result.size_multiplier
 
-            # Calculate contracts (simplified - no ATR normalization for webhook signals)
-            if stop_distance_points > 0:
-                contracts = int(risk_dollars / stop_distance_points)
+            # Calculate contracts using position sizer (with ATR normalization if features available)
+            if bars_15m is not None and len(bars_15m) > 0:
+                # Full ATR normalization if we have bars
+                contracts = self.position_sizer.calculate_contracts(
+                    symbol=signal.symbol,
+                    risk_dollars=risk_dollars,
+                    stop_points=stop_distance_points,
+                    atr_current=features.atr_14,
+                    atr_baseline=features.baseline_atr,
+                    dll_constraint=self.constraint_engine.get_dll_constraint(),
+                    mental_state=mental_result.current_state.value
+                )
             else:
-                logger.warning("Signal has zero stop distance - rejecting")
-                return {
-                    "status": "rejected",
-                    "action": "REJECT",
-                    "reason": "Invalid stop distance (zero)",
-                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
-                    "symbol": signal.symbol,
-                    "direction": signal.direction
-                }
+                # Simplified sizing for webhook signals (no ATR data)
+                point_value = self.instrument_spec.get_point_value(signal.symbol)
+                if stop_distance_points > 0:
+                    risk_per_contract = stop_distance_points * point_value
+                    contracts = int(risk_dollars / risk_per_contract) if risk_per_contract > 0 else 0
+                else:
+                    logger.warning("Signal has zero stop distance - rejecting")
+                    return {
+                        "status": "rejected",
+                        "action": "REJECT",
+                        "reason": "Invalid stop distance (zero)",
+                        "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                        "symbol": signal.symbol,
+                        "direction": signal.direction
+                    }
 
             if contracts < 1:
                 logger.info(f"Position too small after sizing: {contracts}")
@@ -455,7 +484,8 @@ class TransmissionOrchestrator:
             # Step 5: Constraint Validation (Simplified)
             # Get current bid/ask from broker
             bid, ask = self.broker.get_bid_ask(signal.symbol)
-            spread_ticks = (ask - bid) / 0.25  # Assuming tick size = 0.25
+            tick_size = self.instrument_spec.get_tick_size(signal.symbol)
+            spread_ticks = (ask - bid) / tick_size
 
             # DLL constraint
             dll_constraint = self.constraint_engine.get_dll_constraint()
@@ -687,6 +717,7 @@ class TransmissionOrchestrator:
             
             # Calculate contracts
             contracts = self.position_sizer.calculate_contracts(
+                symbol=signal.symbol,  # ADD THIS
                 risk_dollars=risk_dollars,
                 stop_points=stop_distance_points,
                 atr_current=features.atr_14,
