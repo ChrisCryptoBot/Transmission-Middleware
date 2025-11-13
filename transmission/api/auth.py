@@ -11,6 +11,7 @@ import secrets
 import hashlib
 from dataclasses import dataclass
 from loguru import logger
+from fastapi import Header, HTTPException, status
 
 
 @dataclass
@@ -227,3 +228,30 @@ def get_auth_manager() -> AuthManager:
     if _auth_manager is None:
         _auth_manager = AuthManager()
     return _auth_manager
+
+
+def verify_api_key(api_key: str = Header(..., alias="X-API-Key")) -> str:
+    """
+    Verify API key and return user_id.
+    
+    FastAPI dependency for API key authentication.
+    
+    Args:
+        api_key: API key from X-API-Key header
+        
+    Returns:
+        user_id: User ID associated with the API key
+        
+    Raises:
+        HTTPException: If API key is invalid
+    """
+    auth_manager = get_auth_manager()
+    user = auth_manager.validate_api_key(api_key)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing API key"
+        )
+    
+    return user.user_id

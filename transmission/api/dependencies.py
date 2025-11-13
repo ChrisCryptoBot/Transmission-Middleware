@@ -5,13 +5,13 @@ Dependency injection for FastAPI routes.
 Supports both single-user (MVP) and multi-user (production) modes.
 """
 
-from fastapi import Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header, Request
 from typing import Optional, Dict
 from pathlib import Path
 from loguru import logger
 
 from transmission.orchestrator.transmission import TransmissionOrchestrator
-from transmission.api.auth import get_auth_manager, User
+from transmission.api.auth import get_auth_manager, User, verify_api_key
 
 # Global orchestrator (single-user mode)
 _orchestrator: Optional[TransmissionOrchestrator] = None
