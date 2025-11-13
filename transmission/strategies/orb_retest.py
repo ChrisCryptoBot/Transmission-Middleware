@@ -54,6 +54,8 @@ class ORBRetestStrategy(BaseStrategy):
             bounce_confirmation_bars: Bars to confirm bounce before entry
             instrument_spec_service: For multi-asset tick size lookups
         """
+        super().__init__()
+
         self.or_duration_minutes = or_duration_minutes
         self.retest_tolerance_atr = retest_tolerance_atr
         self.min_or_range_atr = min_or_range_atr
@@ -68,16 +70,6 @@ class ORBRetestStrategy(BaseStrategy):
         self.breakout_direction: Optional[str] = None  # 'LONG' or 'SHORT'
         self.retest_in_progress = False
         self.bounce_bars = 0
-    
-    @property
-    def required_regime(self) -> str:
-        """This strategy works in RANGE regime"""
-        return 'RANGE'
-    
-    @property
-    def strategy_name(self) -> str:
-        """Human-readable strategy name"""
-        return 'ORB Retest'
 
     def generate_signal(
         self,

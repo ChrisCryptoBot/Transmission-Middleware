@@ -45,27 +45,6 @@ class Database:
         """Create all database tables"""
         cursor = self.conn.cursor()
         
-        # Check if trades table exists and add gear columns if missing (migration)
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='trades'")
-        trades_exists = cursor.fetchone() is not None
-        
-        if trades_exists:
-            # Add gear columns if they don't exist (migration)
-            try:
-                cursor.execute("ALTER TABLE trades ADD COLUMN gear_at_entry TEXT")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-            
-            try:
-                cursor.execute("ALTER TABLE trades ADD COLUMN gear_at_exit TEXT")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-            
-            try:
-                cursor.execute("ALTER TABLE trades ADD COLUMN gear_shift_reason_entry TEXT")
-            except sqlite3.OperationalError:
-                pass  # Column already exists
-        
         # Trade Journal (Complete schema from Product_Concept.txt)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS trades (

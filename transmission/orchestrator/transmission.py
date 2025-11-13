@@ -41,6 +41,7 @@ from transmission.orchestrator.gear_state import GearStateMachine, GearContext, 
 from transmission.database import Database
 from transmission.config.config_loader import ConfigLoader
 from transmission.config.instrument_specs import InstrumentSpecService
+from transmission.api.websocket import broadcast_gear_change
 from datetime import datetime
 
 
@@ -191,9 +192,9 @@ class TransmissionOrchestrator:
         
         # Strategies (regime-based strategy selection)
         self.strategies: Dict[str, BaseStrategy] = {
-            'TREND': VWAPPullbackStrategy(),
-            'RANGE': ORBRetestStrategy(),
-            'VOLATILE': MeanReversionStrategy(),
+            'TREND': VWAPPullbackStrategy(instrument_spec_service=self.instrument_spec),
+            'RANGE': ORBRetestStrategy(instrument_spec_service=self.instrument_spec),
+            'VOLATILE': MeanReversionStrategy(instrument_spec_service=self.instrument_spec),
         }
         
         self.current_strategy: Optional[BaseStrategy] = None
@@ -450,8 +451,22 @@ class TransmissionOrchestrator:
             
             current_gear, gear_reason = self.gear_state_machine.shift(gear_context)
             
-            # Broadcast gear change if shift occurred (via gear state machine's WebSocket manager)
-            # The gear_state_machine will handle broadcasting if WebSocket manager is set
+            # Broadcast gear change if shift occurred
+            if previous_gear != current_gear:
+                broadcast_gear_change(
+                    from_gear=previous_gear.value,
+                    to_gear=current_gear.value,
+                    reason=gear_reason,
+                    context={
+                        'daily_r': gear_context.daily_r,
+                        'weekly_r': gear_context.weekly_r,
+                        'consecutive_losses': gear_context.consecutive_losses,
+                        'regime': gear_context.regime,
+                        'mental_state': gear_context.mental_state,
+                        'volatility_percentile': gear_context.volatility_percentile,
+                        'dll_remaining': gear_context.dll_remaining,
+                    }
+                )
 
             logger.info(f"Current gear: {current_gear.value} ({gear_reason})")
 

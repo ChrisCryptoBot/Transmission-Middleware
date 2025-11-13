@@ -60,6 +60,8 @@ class MeanReversionStrategy(BaseStrategy):
             reversal_confirmation_bars: Bars to confirm reversal
             instrument_spec_service: For multi-asset support
         """
+        super().__init__()
+
         self.rsi_period = rsi_period
         self.rsi_oversold = rsi_oversold
         self.rsi_overbought = rsi_overbought
@@ -70,16 +72,6 @@ class MeanReversionStrategy(BaseStrategy):
         self.min_bars_from_mean = min_bars_from_mean
         self.reversal_confirmation_bars = reversal_confirmation_bars
         self.instrument_spec = instrument_spec_service or InstrumentSpecService()
-    
-    @property
-    def required_regime(self) -> str:
-        """This strategy works in VOLATILE regime"""
-        return 'VOLATILE'
-    
-    @property
-    def strategy_name(self) -> str:
-        """Human-readable strategy name"""
-        return 'Mean Reversion'
 
     def generate_signal(
         self,

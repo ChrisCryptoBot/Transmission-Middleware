@@ -181,26 +181,24 @@ def broadcast_flatten_all(reason: str):
     })
 
 
-def broadcast_gear_change(
-    from_gear: str,
-    to_gear: str,
-    reason: str,
-    context: Optional[dict] = None
-):
+def broadcast_gear_change(from_gear: str, to_gear: str, reason: str, context: dict):
     """
     Broadcast gear change event to all clients.
-    
+
     Args:
         from_gear: Previous gear (P/R/N/D/L)
         to_gear: New gear (P/R/N/D/L)
-        reason: Reason for gear shift
-        context: Optional context snapshot (daily_r, weekly_r, etc.)
+        reason: Reason for the shift
+        context: GearContext dict with daily_r, weekly_r, etc.
     """
     manager.broadcast({
         "type": "gear_change",
+        "timestamp": datetime.now().isoformat(),
         "from_gear": from_gear,
         "to_gear": to_gear,
-        "reason": reason,
-        "context": context or {},
-        "timestamp": datetime.now().isoformat()
+        "gear_reason": reason,
+        "daily_r": context.get('daily_r', 0.0),
+        "weekly_r": context.get('weekly_r', 0.0),
+        "consecutive_losses": context.get('consecutive_losses', 0)
     })
+
