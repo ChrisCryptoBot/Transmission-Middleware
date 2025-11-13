@@ -1,283 +1,306 @@
 """
-Webhook Integration Routes
+Webhook Integration Endpoints
 
-Endpoints for receiving signals from external platforms:
-- TradingView
-- MetaTrader 5
-- Generic webhooks
+Receives signals from external platforms (TradingView, MT5, custom integrations)
+and processes them through Transmission's adaptive middleware.
+
+This is the key to the multi-interface strategy - users can send signals from
+ANY platform and Transmission adds the intelligence layer.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Header, Request
-from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
+from datetime import datetime
 from loguru import logger
 
-from transmission.strategies.signal_adapter import (
-    TradingViewAdapter,
-    MT5Adapter,
-    GenericWebhookAdapter,
-    get_adapter
-)
-from transmission.api.auth import verify_api_key
-from transmission.api.dependencies import get_orchestrator_for_user
+from transmission.api.auth import User
+from transmission.api.dependencies import get_current_user, get_orchestrator_for_user
+from transmission.strategies.signal_adapter import get_signal_adapter
 from transmission.orchestrator.transmission import TransmissionOrchestrator
 
-router = APIRouter(prefix="/webhooks", tags=["webhooks"])
+router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
 
-@router.post("/tradingview")
+# Response Models
+class WebhookResponse(BaseModel):
+    """Webhook processing response"""
+    status: str  # "received", "processed", "rejected"
+    signal_id: Optional[str] = None
+    reason: Optional[str] = None
+    timestamp: datetime
+    message: str
+
+
+# Webhook Endpoints
+
+@router.post("/tradingview", response_model=WebhookResponse)
 async def tradingview_webhook(
     alert: Dict[str, Any],
-    request: Request,
-    api_key: str = Header(..., alias="X-API-Key")
+    user: User = Depends(get_current_user),
+    orchestrator: TransmissionOrchestrator = Depends(get_orchestrator_for_user)
 ):
     """
     TradingView webhook endpoint.
-    
+
     Receives TradingView alerts and processes them through Transmission.
-    
-    **TradingView Alert Format:**
+
+    **Required Headers:**
+    - X-API-Key: Your Transmission API key
+
+    **Expected Payload:**
     ```json
     {
         "ticker": "MNQ",
-        "action": "BUY",
+        "action": "BUY",  // or "SELL"
         "close": 12345.50,
-        "time": 1234567890,
-        "message": "VWAP pullback setup"
+        "time": 1703001600,  // optional
+        "strategy": "VWAP Pullback",  // optional
+        "message": "Entry signal"  // optional
     }
     ```
-    
-    **Headers:**
-    - `X-API-Key`: Your Transmission API key
-    
+
+    **TradingView Setup:**
+    1. Create alert in TradingView
+    2. Set alert message to JSON format above
+    3. Set webhook URL: https://your-api.com/api/webhooks/tradingview
+    4. Add X-API-Key header in TradingView webhook settings
+
     **Returns:**
-    - `status`: "processed" | "rejected" | "error"
-    - `signal_id`: Unique signal identifier
-    - `action`: "TRADE" | "SKIP" | "REJECT"
-    - `reason`: Explanation of action
+    - status: "received" (acknowledged), "processed" (signal generated), or "rejected"
+    - reason: Why signal was accepted or rejected
     """
     try:
-        # Verify API key and get user_id
-        user_id = verify_api_key(api_key)
-        
-        # Get user's orchestrator
-        orchestrator = get_orchestrator_for_user(user_id)
-        
-        # Parse TradingView alert
-        adapter = TradingViewAdapter()
+        # Get TradingView adapter
+        adapter = get_signal_adapter("tradingview")
+
+        # Validate signal format
         if not adapter.validate(alert):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid TradingView alert format. Required: ticker, action, close"
+            return WebhookResponse(
+                status="rejected",
+                reason="Invalid TradingView alert format",
+                timestamp=datetime.now(),
+                message="Signal rejected - check format"
             )
-        
+
+        # Parse to Transmission Signal
         signal = adapter.parse(alert)
-        
-        logger.info(
-            f"TradingView webhook: {signal.direction} {signal.symbol} @ {signal.entry_price}"
+
+        # Log webhook received
+        logger.info(f"TradingView webhook received from user {user.user_id}: {signal.strategy} {signal.direction} on {alert.get('ticker')}")
+
+        # Process signal through orchestrator
+        result = await orchestrator.process_signal(signal)
+
+        return WebhookResponse(
+            status=result["status"],
+            signal_id=result.get("signal_id"),
+            reason=result.get("reason"),
+            timestamp=datetime.now(),
+            message=f"TradingView {signal.direction} signal for {alert.get('ticker')} {result['action'].lower()}"
         )
-        
-        # Process signal through full Transmission pipeline
-        result = orchestrator.process_signal(
-            signal=signal,
-            current_price=signal.entry_price,
-            bid=None,  # TradingView alerts don't include bid/ask
-            ask=None,
-            bars_15m=None  # No historical bars from webhook
+
+    except ValueError as e:
+        logger.error(f"TradingView webhook parse error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid signal format: {str(e)}"
         )
-        
-        return {
-            **result,
-            "symbol": signal.symbol,
-            "direction": signal.direction,
-            "entry_price": signal.entry_price
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"TradingView webhook error: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500,
-            detail=f"Error processing TradingView webhook: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process webhook"
         )
 
 
-@router.post("/mt5")
+@router.post("/mt5", response_model=WebhookResponse)
 async def mt5_webhook(
     signal: Dict[str, Any],
-    request: Request,
-    api_key: str = Header(..., alias="X-API-Key")
+    user: User = Depends(get_current_user),
+    orchestrator: TransmissionOrchestrator = Depends(get_orchestrator_for_user)
 ):
     """
     MetaTrader 5 webhook endpoint.
-    
-    Receives MT5 EA signals and processes them through Transmission.
-    
-    **MT5 Signal Format:**
+
+    Receives MT5 Expert Advisor signals and processes them through Transmission.
+
+    **Required Headers:**
+    - X-API-Key: Your Transmission API key
+
+    **Expected Payload:**
     ```json
     {
         "symbol": "MNQ",
-        "type": 0,  // 0 = BUY, 1 = SELL
+        "type": 0,  // 0=BUY, 1=SELL
         "price": 12345.50,
-        "comment": "VWAP pullback",
-        "magic": 12345
+        "sl": 12300.0,  // stop loss (optional)
+        "tp": 12400.0,  // take profit (optional)
+        "volume": 1.0,  // lot size
+        "comment": "MA Crossover",  // optional
+        "magic": 123456  // EA magic number (optional)
     }
     ```
-    
-    **Headers:**
-    - `X-API-Key`: Your Transmission API key
-    
+
+    **MT5 Setup:**
+    Use an HTTP library in your EA to POST signals:
+    ```mql5
+    string url = "https://your-api.com/api/webhooks/mt5";
+    string headers = "X-API-Key: your_api_key\r\n";
+    string data = "{\"symbol\":\"MNQ\",\"type\":0,\"price\":12345.50}";
+    WebRequest("POST", url, headers, 5000, data, result, result_headers);
+    ```
+
     **Returns:**
-    - `status`: "processed" | "rejected" | "error"
-    - `signal_id`: Unique signal identifier
-    - `action`: "TRADE" | "SKIP" | "REJECT"
-    - `reason`: Explanation of action
+    - status: "received", "processed", or "rejected"
+    - reason: Why signal was accepted or rejected
     """
     try:
-        # Verify API key and get user_id
-        user_id = verify_api_key(api_key)
-        
-        # Get user's orchestrator
-        orchestrator = get_orchestrator_for_user(user_id)
-        
-        # Parse MT5 signal
-        adapter = MT5Adapter()
+        # Get MT5 adapter
+        adapter = get_signal_adapter("mt5")
+
+        # Validate signal format
         if not adapter.validate(signal):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid MT5 signal format. Required: symbol, type, price"
+            return WebhookResponse(
+                status="rejected",
+                reason="Invalid MT5 signal format",
+                timestamp=datetime.now(),
+                message="Signal rejected - check format"
             )
-        
-        transmission_signal = adapter.parse(signal)
-        
-        logger.info(
-            f"MT5 webhook: {transmission_signal.direction} {transmission_signal.symbol} @ {transmission_signal.entry_price}"
+
+        # Parse to Transmission Signal
+        parsed_signal = adapter.parse(signal)
+
+        # Log webhook received
+        logger.info(f"MT5 webhook received from user {user.user_id}: {parsed_signal.strategy} {parsed_signal.direction} on {signal.get('symbol')}")
+
+        # Process signal through orchestrator
+        result = await orchestrator.process_signal(parsed_signal)
+
+        return WebhookResponse(
+            status=result["status"],
+            signal_id=result.get("signal_id"),
+            reason=result.get("reason"),
+            timestamp=datetime.now(),
+            message=f"MT5 {parsed_signal.direction} signal for {signal.get('symbol')} {result['action'].lower()}"
         )
-        
-        # Process signal through full Transmission pipeline
-        result = orchestrator.process_signal(
-            signal=transmission_signal,
-            current_price=transmission_signal.entry_price,
-            bid=None,  # MT5 signals may not include bid/ask
-            ask=None,
-            bars_15m=None
+
+    except ValueError as e:
+        logger.error(f"MT5 webhook parse error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid signal format: {str(e)}"
         )
-        
-        return {
-            **result,
-            "symbol": transmission_signal.symbol,
-            "direction": transmission_signal.direction,
-            "entry_price": transmission_signal.entry_price
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"MT5 webhook error: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500,
-            detail=f"Error processing MT5 webhook: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process webhook"
         )
 
 
-@router.post("/generic")
+@router.post("/generic", response_model=WebhookResponse)
 async def generic_webhook(
     signal: Dict[str, Any],
-    request: Request,
-    api_key: str = Header(..., alias="X-API-Key"),
-    platform: str = Header(None, alias="X-Platform")
+    user: User = Depends(get_current_user),
+    orchestrator: TransmissionOrchestrator = Depends(get_orchestrator_for_user)
 ):
     """
     Generic webhook endpoint for custom integrations.
-    
-    Accepts signals in Transmission format or uses platform-specific adapter.
-    
-    **Generic Format:**
+
+    Flexible format for any platform or custom signal source.
+
+    **Required Headers:**
+    - X-API-Key: Your Transmission API key
+
+    **Expected Payload:**
     ```json
     {
         "symbol": "MNQ",
-        "direction": "LONG",
-        "entry_price": 12345.50,
-        "timestamp": "2024-12-19T10:00:00Z",
-        "strategy": "Custom",
-        "confidence": 0.8,
-        "notes": "Custom signal"
+        "side": "LONG",  // or "SHORT"
+        "entry": 12345.50,
+        "stop": 12300.0,  // optional
+        "target": 12400.0,  // optional
+        "contracts": 1,  // optional
+        "strategy": "Custom Strategy",  // optional
+        "confidence": 0.8,  // optional (0.0-1.0)
+        "notes": "Custom signal"  // optional
     }
     ```
-    
-    **Headers:**
-    - `X-API-Key`: Your Transmission API key
-    - `X-Platform`: Optional platform identifier (for adapter selection)
-    
+
+    **Example (cURL):**
+    ```bash
+    curl -X POST https://your-api.com/api/webhooks/generic \
+      -H "X-API-Key: your_api_key" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "symbol": "MNQ",
+        "side": "LONG",
+        "entry": 12345.50,
+        "stop": 12300.0,
+        "target": 12400.0
+      }'
+    ```
+
     **Returns:**
-    - `status`: "processed" | "rejected" | "error"
-    - `signal_id`: Unique signal identifier
-    - `action`: "TRADE" | "SKIP" | "REJECT"
-    - `reason`: Explanation of action
+    - status: "received", "processed", or "rejected"
+    - reason: Why signal was accepted or rejected
     """
     try:
-        # Verify API key
-        user_id = verify_api_key(api_key)
-        
-        # Get user's orchestrator
-        orchestrator = get_orchestrator_for_user(user_id)
-        
-        # Select adapter
-        if platform:
-            adapter = get_adapter(platform)
-        else:
-            adapter = GenericWebhookAdapter()
-        
-        # Parse signal
+        # Get generic adapter
+        adapter = get_signal_adapter("generic")
+
+        # Validate signal format
         if not adapter.validate(signal):
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid signal format. Required: symbol, direction, entry_price"
+            return WebhookResponse(
+                status="rejected",
+                reason="Invalid generic signal format",
+                timestamp=datetime.now(),
+                message="Signal rejected - check format"
             )
-        
-        transmission_signal = adapter.parse(signal)
-        
-        logger.info(
-            f"Generic webhook ({platform or 'default'}): {transmission_signal.direction} "
-            f"{transmission_signal.symbol} @ {transmission_signal.entry_price}"
+
+        # Parse to Transmission Signal
+        parsed_signal = adapter.parse(signal)
+
+        # Log webhook received
+        logger.info(f"Generic webhook received from user {user.user_id}: {parsed_signal.strategy} {parsed_signal.direction} on {signal.get('symbol')}")
+
+        # Process signal through orchestrator
+        result = await orchestrator.process_signal(parsed_signal)
+
+        return WebhookResponse(
+            status=result["status"],
+            signal_id=result.get("signal_id"),
+            reason=result.get("reason"),
+            timestamp=datetime.now(),
+            message=f"Generic {parsed_signal.direction} signal for {signal.get('symbol')} {result['action'].lower()}"
         )
-        
-        # Process signal through full Transmission pipeline
-        result = orchestrator.process_signal(
-            signal=transmission_signal,
-            current_price=transmission_signal.entry_price,
-            bid=None,
-            ask=None,
-            bars_15m=None
+
+    except ValueError as e:
+        logger.error(f"Generic webhook parse error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid signal format: {str(e)}"
         )
-        
-        return {
-            **result,
-            "symbol": transmission_signal.symbol,
-            "direction": transmission_signal.direction,
-            "entry_price": transmission_signal.entry_price
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Generic webhook error: {e}", exc_info=True)
         raise HTTPException(
-            status_code=500,
-            detail=f"Error processing webhook: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process webhook"
         )
 
 
 @router.get("/health")
 async def webhook_health():
-    """Health check for webhook endpoints"""
+    """
+    Webhook system health check.
+
+    Public endpoint (no authentication required).
+    Use this to verify webhook infrastructure is operational.
+    """
     return {
         "status": "healthy",
-        "endpoints": {
-            "tradingview": "/webhooks/tradingview",
-            "mt5": "/webhooks/mt5",
-            "generic": "/webhooks/generic"
-        },
-        "supported_platforms": ["tradingview", "mt5", "generic"]
+        "service": "webhooks",
+        "supported_platforms": ["tradingview", "mt5", "generic"],
+        "timestamp": datetime.now().isoformat()
     }
-

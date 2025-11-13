@@ -5,7 +5,7 @@ Avoids trading during high-impact news windows.
 Loads economic calendar and enforces blackout intervals.
 """
 
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Literal
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from loguru import logger

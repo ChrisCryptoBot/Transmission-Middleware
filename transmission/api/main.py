@@ -13,7 +13,7 @@ import uvicorn
 import os
 from datetime import datetime
 
-from transmission.api.routes import trades, metrics, system, signals, webhooks
+from transmission.api.routes import trades, metrics, system, signals, auth, webhooks
 from transmission.api.websocket import websocket_endpoint, set_orchestrator as set_ws_orchestrator
 from transmission.api.dependencies import set_orchestrator as set_dep_orchestrator
 from transmission.api.middleware import LoggingMiddleware, SecurityHeadersMiddleware
@@ -54,7 +54,9 @@ app.add_middleware(
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(LoggingMiddleware)
 
-# Include routers with /api prefix
+# Include routers
+app.include_router(auth.router)  # Auth routes have /api/auth prefix in router definition
+app.include_router(webhooks.router)  # Webhook routes have /api/webhooks prefix in router definition
 app.include_router(trades.router, prefix="/api")
 app.include_router(metrics.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
@@ -109,6 +111,8 @@ async def root():
         "version": "0.1.0",
         "status": "running",
         "endpoints": {
+            "auth": "/api/auth",
+            "webhooks": "/api/webhooks",
             "status": "/api/system/status",
             "trades": "/api/trades",
             "metrics": "/api/metrics",

@@ -58,10 +58,10 @@ class InTradeState:
     current_target: Optional[float]
     trailing_stop: Optional[TrailingStopConfig]
     scale_out_rules: list[ScaleOutRule]
-    max_bars: Optional[int] = None
-    bars_in_trade: int = 0
     highest_price: float  # For longs
     lowest_price: float  # For shorts
+    max_bars: Optional[int] = None
+    bars_in_trade: int = 0
     unrealized_pnl_r: float = 0.0
     realized_pnl_r: float = 0.0
 

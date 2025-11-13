@@ -1,7 +1,7 @@
 # Product Architecture Decision
 
-**Date:** 2024-12-19  
-**Status:** ✅ **APPROVED** - Multi-Interface Middleware Platform  
+**Date:** 2025-11-13
+**Status:** ✅ **RECOMMENDED** - Multi-Interface Middleware Platform
 **Context:** MVP complete (100% Blueprint compliance), determining best product delivery model
 
 ---
@@ -18,642 +18,716 @@
 
 ---
 
-## Architecture Strategy
+## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────┐
-│         TRANSMISSION CORE (Python)              │
-│  (Regime AI, Risk Governor, Execution Engine)   │
-└──────────────┬──────────────────────────────────┘
-               │
-       ┌───────┴───────┐
-       │   REST API     │ (FastAPI - Already built ✅)
-       │   WebSocket    │
-       └───────┬───────┘
-               │
-    ┌──────────┼──────────┬──────────────┐
-    │          │          │              │
-┌───▼───┐  ┌──▼───┐  ┌───▼────┐   ┌────▼─────┐
-│ React │  │Stream│  │ Webhook│   │   SDK    │
-│ Web   │  │ lit  │  │Adapter │   │(Future)  │
-│ App   │  │Dash  │  │(Future)│   │          │
-└───────┘  └──────┘  └────────┘   └──────────┘
-   ✅         ✅         📅            📅
+┌──────────────────────────────────────────────────────────────┐
+│              TRANSMISSION CORE MIDDLEWARE                     │
+│  • Regime Classifier  • Risk Governor  • Execution Engine    │
+│  • Multi-TF Fusion    • Mental Governor • News Flat          │
+│  • In-Trade Manager   • Journal Analytics                    │
+└───────────────────────────┬──────────────────────────────────┘
+                            │
+                 ┌──────────┴──────────┐
+                 │   FastAPI Backend   │ ✅ IMPLEMENTED
+                 │  REST + WebSocket   │
+                 └──────────┬──────────┘
+                            │
+         ┌──────────────────┼──────────────────┬────────────┐
+         │                  │                  │            │
+    ┌────▼─────┐      ┌─────▼──────┐    ┌─────▼────┐  ┌────▼─────┐
+    │  React   │      │ Streamlit  │    │ Webhooks │  │   SDK    │
+    │   Web    │      │ Dashboard  │    │  Plugin  │  │  (API)   │
+    │   App    │      │  (Ops/QA)  │    │  System  │  │          │
+    └──────────┘      └────────────┘    └──────────┘  └──────────┘
+        ✅                 ✅               📅 Phase 2    📅 Phase 3
+
+   Primary UI         Internal Ops      Integration      Developer
+   for traders        monitoring        adapters         access
 ```
 
 ---
 
-## Why This Hybrid Approach Wins
+## Decision Matrix
 
-| Architecture | Pros | Cons | Verdict |
-|--------------|------|------|---------|
-| Dashboard Only | Full control, beautiful UX | Users must leave their platform | ❌ Too limiting |
-| Plugin Only | Users stay in their workflow | Platform-dependent, fragmented | ❌ Risky bet |
-| SDK Only | Developers can integrate | Excludes non-technical users | ❌ Too niche |
-| ✅ **Middleware + Multi-Interface** | Reaches all segments, flexible | More build effort | ✅ **BEST** |
-
----
-
-## Go-To-Market Architecture (Phased)
-
-### Phase 1: MVP (Current - ✅ Complete)
-
-**Backend:** FastAPI (REST + WebSocket) ✅  
-**Frontend:** React 18 (primary UI) ✅  
-**Ops:** Streamlit (QA/monitoring) ✅
-
-**This is CORRECT. Ship this first for:**
-- Direct users (traders running it locally/cloud)
-- Proof of concept
-- Beta testers
-
-**Status:** ✅ **100% Complete**
+| Architecture Model | Market Reach | Time to Market | Revenue Potential | Risk | Verdict |
+|-------------------|--------------|----------------|-------------------|------|---------|
+| **Dashboard Only** | 🟡 Medium (direct users only) | 🟢 Fast (2-3 months) | 🟡 Medium ($99/mo SaaS) | 🟢 Low | ❌ Too limiting |
+| **Plugin Only** | 🟢 High (existing platform users) | 🔴 Slow (6+ months) | 🟡 Medium (platform-dependent) | 🔴 High (fragmentation) | ❌ Risky |
+| **SDK Only** | 🔴 Low (developers only) | 🟢 Fast (1-2 months) | 🔴 Low (niche market) | 🟢 Low | ❌ Too niche |
+| **✅ Hybrid Platform** | 🟢 High (all segments) | 🟡 Medium (3-6 months phased) | 🟢 High (multi-tier pricing) | 🟡 Medium | ✅ **BEST** |
 
 ---
 
-### Phase 2: Webhook Integration (Q1 2025)
+## Phased Implementation Roadmap
 
-**Build adapters for existing platforms:**
+### **Phase 1: Standalone Web App (MVP - Current)**
+**Timeline:** ✅ COMPLETE
+**Status:** 100% Blueprint compliance achieved
 
-#### TradingView Webhook → Transmission
-```python
-@app.post("/webhook/tradingview")
-async def tradingview_signal(signal: TradingViewAlert):
-    return await transmission.process_signal(signal)
-```
-
-#### MetaTrader EA → Transmission
-```python
-@app.post("/webhook/mt5")
-async def mt5_signal(signal: MT5Signal):
-    return await transmission.process_signal(signal)
-```
-
-**Why this matters:**
-- Traders already use TradingView/MT5
-- Your middleware adds the "intelligence layer"
-- They don't have to abandon their workflow
-- **5M+ potential users** who already use TradingView
-
-**Target:** Month 4-6 post-MVP
-
----
-
-### Phase 3: SDK for Developers (Q2 2025)
-
-```python
-# transmission-sdk for Python
-from transmission import TransmissionClient
-
-client = TransmissionClient(api_key="...")
-signal = {"symbol": "ES", "side": "long"}
-result = await client.process(signal)
-```
-
-**Target:** Month 7+ post-MVP
-
----
-
-## Product Tier Architecture
-
-### Transmission Core (Free/Open Source)
-
-**✅ Standalone CLI** - Run locally, configure via YAML  
-**✅ Web Dashboard** - React frontend (basic)  
-**❌ No cloud hosting** - Self-hosted only  
-**❌ No webhooks** - Manual signal entry only
+**Components:**
+- ✅ FastAPI backend (REST + WebSocket)
+- ✅ React 18 frontend (TypeScript + Vite)
+- ✅ Streamlit dashboard (Ops/QA)
+- ✅ SQLite database (MVP)
+- ✅ All Tier-1 & Tier-2 modules implemented
 
 **Target Users:**
-- Technical traders
-- Developers
-- Self-hosters
+- Beta testers (10-20 funded traders)
+- Early adopters willing to run locally/self-hosted
+- Proof-of-concept customers
 
----
-
-### Transmission Pro ($99-199/month)
-
-**✅ Cloud-hosted** - You run the middleware, users connect  
-**✅ Full Web Dashboard** - Advanced charts, analytics  
-**✅ Webhook Support** - TradingView, MT5 integration  
-**✅ Multi-account** - Manage multiple prop firm accounts  
-**✅ API Access** - REST + WebSocket
-
-**Target Users:**
-- Prop firm traders
-- Serious retail traders
-- Strategy developers
+**Deployment:**
+```bash
+# User runs locally
+python startup/run_api.py        # Backend on :8000
+npm run dev (in web/)            # Frontend on :5173
+python startup/run_dashboard.py # Ops dashboard on :8501
+```
 
 **Revenue Model:**
-- Subscription: $99-199/month
-- Per-account pricing: +$29/month per additional account
-- Webhook usage: Included (up to 1000 signals/month)
+- Free during beta
+- $99-199/month once proven
 
 ---
 
-### Transmission Enterprise ($5k+/month)
+### **Phase 2: Webhook Integration Layer (Months 4-6)**
+**Timeline:** 📅 Q1 2025
+**Priority:** ⚠️ HIGH (unlocks existing platform users)
 
-**✅ White-label Dashboard** - Branded for strategy sellers  
-**✅ SDK Access** - Python/REST API for custom integrations  
-**✅ Custom Plugins** - Build your own connectors  
-**✅ Dedicated Infrastructure** - Private deployment  
-**✅ SLA** - 99.9% uptime guarantee  
-**✅ Custom Development** - Strategy-specific adaptations
+**Objective:** Allow users to keep their existing workflow (TradingView, MT5, etc.) while Transmission adds the intelligence layer.
 
-**Target Users:**
-- Strategy sellers
-- Small hedge funds
-- CTAs (Commodity Trading Advisors)
-- Prop firms (white-label)
+**Implementation:**
 
-**Revenue Model:**
-- Base: $5,000/month
-- Custom development: $150/hour
-- White-label: +$2,000/month
-- Dedicated infrastructure: +$3,000/month
-
----
-
-## Critical Architectural Decisions
-
-### ✅ DO THIS:
-
-#### 1. Keep FastAPI as the Core
-
-**All logic lives in `transmission/` modules**  
-**API is the universal interface**  
-**Multiple frontends connect to same backend**
-
-**Current State:** ✅ Already implemented
-
-#### 2. Build React Dashboard First
-
-**Primary user interface for MVP**  
-**Ship this for beta users**  
-**Prove the value before expanding**
-
-**Current State:** ✅ React 18 + TypeScript + Vite setup complete
-
-#### 3. Design for Multi-Tenancy Now
-
+1. **TradingView Webhook Adapter**
 ```python
-# transmission/api/routes.py
-@app.post("/api/v1/signals", dependencies=[Depends(verify_api_key)])
-async def process_signal(
-    signal: Signal, 
-    user_id: str = Depends(get_user_from_api_key)
+# transmission/api/routes/webhooks.py
+from transmission.adapters.tradingview import TradingViewAdapter
+
+@app.post("/api/v1/webhooks/tradingview")
+async def tradingview_webhook(
+    alert: dict,
+    api_key: str = Depends(validate_api_key),
+    user_id: str = Depends(get_user_from_key)
 ):
-    # Each user has isolated state
+    """
+    TradingView sends:
+    {
+      "ticker": "ES",
+      "action": "buy",
+      "price": 4500,
+      "strategy": "VWAP Pullback"
+    }
+
+    Transmission processes through:
+    - Regime check (is market in TREND?)
+    - Risk check (within daily limits?)
+    - Multi-TF confirmation
+    - Execution guard (liquidity ok?)
+    """
+    adapter = TradingViewAdapter()
+    signal = adapter.parse(alert)
+
     orchestrator = get_orchestrator_for_user(user_id)
-    return await orchestrator.process(signal)
+    result = await orchestrator.process_signal(signal)
+
+    return {"status": result.status, "reason": result.reason}
 ```
 
-**Action Required:** ⚠️ Not yet implemented
-
-#### 4. Abstract the Signal Source
-
+2. **MetaTrader 5 Adapter**
 ```python
-# transmission/strategies/base.py
-class SignalAdapter:
-    """Convert ANY signal format → Transmission format"""
-    
+# transmission/api/routes/webhooks.py
+@app.post("/api/v1/webhooks/mt5")
+async def mt5_webhook(signal: MT5Signal, user: User = Depends(auth)):
+    adapter = MT5Adapter()
+    return await process_via_transmission(adapter.parse(signal), user)
+```
+
+3. **Generic Signal Adapter**
+```python
+# transmission/adapters/base.py
+class SignalAdapter(ABC):
+    """Base class for converting external signals → Transmission format"""
+
     @abstractmethod
     def parse(self, raw_signal: dict) -> Signal:
+        """Convert platform-specific format → Transmission Signal"""
         pass
 
+    def validate(self, signal: Signal) -> bool:
+        """Ensure signal has required fields"""
+        return signal.symbol and signal.side and signal.quantity
+
+# transmission/adapters/tradingview.py
 class TradingViewAdapter(SignalAdapter):
     def parse(self, alert: dict) -> Signal:
         return Signal(
             symbol=alert["ticker"],
-            direction=alert["action"].upper(),
-            entry_price=alert["close"],
-            timestamp=datetime.fromtimestamp(alert["time"])
+            side="LONG" if alert["action"] == "buy" else "SHORT",
+            quantity=alert.get("contracts", 1),
+            strategy_name=alert.get("strategy", "TradingView"),
+            timestamp=datetime.utcnow()
         )
 ```
 
-**Action Required:** ⚠️ Not yet implemented
-
----
-
-### ❌ DON'T DO THIS:
-
-- ❌ **Don't build native desktop app** - Web + cloud is enough
-- ❌ **Don't build mobile app yet** - Web responsive is sufficient
-- ❌ **Don't build browser extension** - Overhead not worth it for MVP
-- ❌ **Don't build platform-specific plugins first** - Webhooks are more flexible
-
----
-
-## Multi-Tenancy Design
-
-### User Isolation Strategy
-
-**Each user gets:**
-- Isolated orchestrator instance
-- Separate database schema (or user_id filtering)
-- Independent risk limits
-- Own API keys
-
-**Implementation Pattern:**
-```python
-# transmission/api/dependencies.py
-from fastapi import Depends, HTTPException, Header
-from transmission.orchestrator.transmission import TransmissionOrchestrator
-
-# User orchestrator cache
-user_orchestrators: Dict[str, TransmissionOrchestrator] = {}
-
-def get_user_from_api_key(api_key: str = Header(..., alias="X-API-Key")) -> str:
-    """Validate API key and return user_id"""
-    user_id = validate_api_key(api_key)
-    if not user_id:
-        raise HTTPException(status_code=403, detail="Invalid API key")
-    return user_id
-
-def get_orchestrator_for_user(user_id: str) -> TransmissionOrchestrator:
-    """Get or create orchestrator for user"""
-    if user_id not in user_orchestrators:
-        user_orchestrators[user_id] = TransmissionOrchestrator(
-            db_path=f"data/user_{user_id}.db"
-        )
-    return user_orchestrators[user_id]
-```
-
----
-
-## Database Schema Updates
-
-### Multi-User Support
-
-**Current:** Single SQLite database  
-**Future:** User-isolated databases or user_id filtering
-
-**Option A: Separate Databases (Recommended for MVP)**
-```python
-# Each user gets their own database
-db_path = f"data/user_{user_id}/transmission.db"
-```
-
-**Option B: Shared Database with user_id (Recommended for Scale)**
-```sql
--- Add user_id to all tables
-ALTER TABLE trades ADD COLUMN user_id TEXT NOT NULL;
-CREATE INDEX idx_trades_user_id ON trades(user_id);
-
--- Filter all queries by user_id
-SELECT * FROM trades WHERE user_id = ?;
-```
-
-**Migration Path:**
-1. **MVP:** Separate databases (simpler, isolated)
-2. **Scale:** Shared database with user_id (better for cloud)
-
----
-
-## SignalAdapter Abstraction
-
-### Platform-Agnostic Signal Processing
-
-**File:** `transmission/strategies/signal_adapter.py`
-
-```python
-from abc import ABC, abstractmethod
-from typing import Dict, Any
-from transmission.strategies.base import Signal
-
-class SignalAdapter(ABC):
-    """Convert platform-specific signals to Transmission format"""
-    
-    @abstractmethod
-    def parse(self, raw_signal: Dict[str, Any]) -> Signal:
-        """Parse platform signal → Transmission Signal"""
-        pass
-    
-    @abstractmethod
-    def validate(self, raw_signal: Dict[str, Any]) -> bool:
-        """Validate signal format"""
-        pass
-
-class TradingViewAdapter(SignalAdapter):
-    """TradingView webhook format"""
-    
-    def validate(self, raw_signal: Dict[str, Any]) -> bool:
-        required = ["ticker", "action", "close", "time"]
-        return all(k in raw_signal for k in required)
-    
-    def parse(self, alert: Dict[str, Any]) -> Signal:
-        return Signal(
-            symbol=alert["ticker"],
-            direction="LONG" if alert["action"].upper() == "BUY" else "SHORT",
-            entry_price=float(alert["close"]),
-            timestamp=datetime.fromtimestamp(alert["time"]),
-            strategy="TradingView",
-            confidence=0.8,  # Default confidence
-            notes=f"TradingView alert: {alert.get('message', '')}"
-        )
-
-class MT5Adapter(SignalAdapter):
-    """MetaTrader 5 EA format"""
-    
-    def validate(self, raw_signal: Dict[str, Any]) -> bool:
-        required = ["symbol", "type", "price"]
-        return all(k in raw_signal for k in required)
-    
-    def parse(self, signal: Dict[str, Any]) -> Signal:
-        return Signal(
-            symbol=signal["symbol"],
-            direction="LONG" if signal["type"] == 0 else "SHORT",
-            entry_price=float(signal["price"]),
-            timestamp=datetime.now(),
-            strategy="MT5_EA",
-            confidence=0.75,
-            notes=f"MT5 EA: {signal.get('comment', '')}"
-        )
-```
-
----
-
-## Webhook Integration Endpoints
-
-### Phase 2 Implementation
-
-**File:** `transmission/api/routes/webhooks.py`
-
-```python
-from fastapi import APIRouter, Depends, HTTPException, Header
-from transmission.strategies.signal_adapter import (
-    TradingViewAdapter, 
-    MT5Adapter,
-    SignalAdapter
+**User Experience:**
+```javascript
+// In TradingView Pine Script
+strategy.entry("Buy", strategy.long, when=entry_condition,
+    alert_message='{
+        "ticker": "{{ticker}}",
+        "action": "buy",
+        "price": {{close}},
+        "strategy": "VWAP Pullback"
+    }'
 )
-from transmission.api.dependencies import verify_api_key, get_orchestrator_for_user
 
-router = APIRouter(prefix="/webhooks", tags=["webhooks"])
-
-@router.post("/tradingview")
-async def tradingview_webhook(
-    alert: dict,
-    api_key: str = Header(..., alias="X-API-Key")
-):
-    """TradingView webhook endpoint"""
-    user_id = verify_api_key(api_key)
-    orchestrator = get_orchestrator_for_user(user_id)
-    
-    adapter = TradingViewAdapter()
-    if not adapter.validate(alert):
-        raise HTTPException(status_code=400, detail="Invalid TradingView alert format")
-    
-    signal = adapter.parse(alert)
-    result = await orchestrator.process_signal(signal)
-    
-    return {
-        "status": "processed",
-        "signal_id": signal.id,
-        "action": result.action,
-        "reason": result.reason
-    }
-
-@router.post("/mt5")
-async def mt5_webhook(
-    signal: dict,
-    api_key: str = Header(..., alias="X-API-Key")
-):
-    """MetaTrader 5 webhook endpoint"""
-    user_id = verify_api_key(api_key)
-    orchestrator = get_orchestrator_for_user(user_id)
-    
-    adapter = MT5Adapter()
-    if not adapter.validate(signal):
-        raise HTTPException(status_code=400, detail="Invalid MT5 signal format")
-    
-    transmission_signal = adapter.parse(signal)
-    result = await orchestrator.process_signal(transmission_signal)
-    
-    return {
-        "status": "processed",
-        "signal_id": transmission_signal.id,
-        "action": result.action,
-        "reason": result.reason
-    }
+// Alert webhook URL
+https://transmission.yourapp.com/api/v1/webhooks/tradingview?key=USER_API_KEY
 ```
 
----
+**Benefits:**
+- Users DON'T leave TradingView/MT5
+- Transmission adds intelligence layer invisibly
+- Expands market to existing platform users (HUGE TAM)
 
-## Revenue Projections
-
-### Conservative Year 1 Estimate
-
-**Assumptions:**
-- 10 beta users (Month 1-3) → 5 convert to Pro
-- 50 Pro users by Month 6 ($99/month avg)
-- 2 Enterprise customers by Month 9 ($5k/month)
-
-**Revenue Breakdown:**
-
-| Tier | Users | Price | Monthly | Annual |
-|------|-------|-------|---------|--------|
-| Pro | 50 | $99 | $4,950 | $59,400 |
-| Enterprise | 2 | $5,000 | $10,000 | $120,000 |
-| **Total** | **52** | - | **$14,950** | **$179,400** |
-
-**Optimistic Scenario (Year 1):**
-- 100 Pro users → $118,800/year
-- 5 Enterprise → $300,000/year
-- **Total: $418,800 ARR**
-
-**Conservative Scenario (Year 1):**
-- 30 Pro users → $35,640/year
-- 1 Enterprise → $60,000/year
-- **Total: $95,640 ARR**
-
-**Target: $238k ARR Year 1** (realistic middle ground)
+**Revenue Impact:**
+- Unlocks TradingView Premium users (5M+ users)
+- Unlocks MT5 users (millions globally)
+- Plugin tier: $49-99/month (lower than standalone)
 
 ---
 
-## Implementation Roadmap
+### **Phase 3: SDK for Developers (Months 7-12)**
+**Timeline:** 📅 Q2-Q3 2025
+**Priority:** 🟡 MEDIUM (enables enterprise/custom integrations)
 
-### Immediate (Next 2 Weeks)
-
-1. **Multi-Tenancy Foundation**
-   - [ ] API key authentication middleware
-   - [ ] User isolation in orchestrator
-   - [ ] Database schema updates (user_id)
-   - [ ] User management endpoints
-
-2. **Production Hardening**
-   - [ ] Idempotency (dedupe fills)
-   - [ ] Crash recovery (reconcile on boot)
-   - [ ] Retry logic with circuit breaker
-
-### Short-Term (Month 1-2)
-
-3. **Webhook Infrastructure**
-   - [ ] SignalAdapter abstraction
-   - [ ] TradingView webhook endpoint
-   - [ ] MT5 webhook endpoint
-   - [ ] Webhook documentation
-
-4. **Frontend Enhancements**
-   - [ ] Charts (PnL, drawdown, heatmaps)
-   - [ ] Toast notifications
-   - [ ] Mental state badge
-   - [ ] News calendar view
-
-### Medium-Term (Month 3-4)
-
-5. **SDK Development**
-   - [ ] Python SDK package
-   - [ ] SDK documentation
-   - [ ] Example integrations
-
-6. **Cloud Infrastructure**
-   - [ ] Multi-tenant database (PostgreSQL)
-   - [ ] User onboarding flow
-   - [ ] Billing integration
-
----
-
-## Technical Specifications
-
-### API Key Authentication
+**Objective:** Allow strategy developers, hedge funds, CTAs to integrate Transmission into their own systems.
 
 **Implementation:**
+
+1. **Python SDK**
 ```python
-# transmission/api/middleware.py
-from fastapi import Request, HTTPException
-from fastapi.security import APIKeyHeader
-import os
+# transmission-sdk (separate PyPI package)
+from transmission import TransmissionClient
 
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+client = TransmissionClient(
+    api_key="sk_live_...",
+    endpoint="https://api.transmission.com"
+)
 
-async def verify_api_key(request: Request, api_key: str = Depends(api_key_header)):
-    """Verify API key and attach user_id to request"""
-    if not api_key:
-        raise HTTPException(status_code=401, detail="API key required")
-    
-    # Validate against database or environment
-    user_id = validate_api_key(api_key)
-    if not user_id:
-        raise HTTPException(status_code=403, detail="Invalid API key")
-    
-    request.state.user_id = user_id
-    return user_id
+# Process a signal
+signal = {
+    "symbol": "ES",
+    "side": "LONG",
+    "quantity": 2,
+    "strategy": "Custom Mean Reversion"
+}
+
+result = await client.process_signal(signal)
+if result.approved:
+    print(f"✅ Signal approved: {result.reason}")
+    print(f"   Adjusted size: {result.adjusted_quantity}")
+else:
+    print(f"❌ Signal rejected: {result.reason}")
+
+# Query analytics
+pnl = await client.get_daily_pnl()
+regime = await client.get_current_regime("ES")
 ```
 
-**Storage:**
-- **MVP:** Environment variables or simple database
-- **Production:** Encrypted database with key rotation
+2. **REST API (Already Exists ✅)**
+```bash
+# Direct API access
+curl -X POST https://api.transmission.com/v1/signals \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbol": "ES",
+    "side": "LONG",
+    "quantity": 2,
+    "strategy": "VWAP Pullback"
+  }'
+```
+
+3. **WebSocket Streaming**
+```python
+# Real-time regime updates
+async with client.stream_regime("ES") as stream:
+    async for regime_update in stream:
+        print(f"Regime changed: {regime_update.regime}")
+        # Adjust strategy accordingly
+```
+
+**Target Users:**
+- Strategy developers (build on top of Transmission)
+- Small hedge funds/CTAs
+- Proprietary trading firms
+- Platform builders
+
+**Revenue Model:**
+- Enterprise tier: $299-999/month
+- API usage-based pricing (per signal processed)
+- White-label: $5k+/month
 
 ---
 
-### User Isolation Pattern
+## Product Tier Architecture Mapping
 
-**Orchestrator Per User:**
-```python
-# transmission/api/dependencies.py
-from typing import Dict
-from transmission.orchestrator.transmission import TransmissionOrchestrator
-
-# In-memory cache (for MVP)
-# Production: Redis or database-backed
-user_orchestrators: Dict[str, TransmissionOrchestrator] = {}
-
-def get_orchestrator_for_user(user_id: str) -> TransmissionOrchestrator:
-    """Get or create user-specific orchestrator"""
-    if user_id not in user_orchestrators:
-        # Create isolated orchestrator
-        orchestrator = TransmissionOrchestrator(
-            db_path=f"data/user_{user_id}/transmission.db",
-            config_path=f"config/user_{user_id}/"
-        )
-        user_orchestrators[user_id] = orchestrator
-    
-    return user_orchestrators[user_id]
+### **Free Tier (Open Source Core)**
+**Architecture:**
 ```
+┌──────────────────────┐
+│  transmission/ core  │ ← Open source on GitHub
+└──────────┬───────────┘
+           │
+      ┌────▼────┐
+      │ CLI     │ ← Run locally via Python
+      └─────────┘
+```
+
+**What's included:**
+- Core middleware logic (regime, risk, execution)
+- Plugin SDK (BaseStrategy interface)
+- YAML configuration
+- SQLite database
+- Self-hosted only
+
+**What's missing:**
+- No cloud hosting
+- No web dashboard
+- No webhook support
+- Community support only
+
+**Revenue Impact:** Lead generation, community building
+
+---
+
+### **Pro Tier ($99-199/month)**
+**Architecture:**
+```
+┌────────────────────────┐
+│ Cloud-hosted backend   │ ← We run FastAPI
+└──────────┬─────────────┘
+           │
+    ┌──────┴────────┐
+    │               │
+┌───▼────┐     ┌────▼────┐
+│ React  │     │Webhooks │
+│  Web   │     │(TV/MT5) │
+└────────┘     └─────────┘
+```
+
+**What's included:**
+- ✅ Full web dashboard (React frontend)
+- ✅ Cloud-hosted execution (we run it)
+- ✅ Webhook support (TradingView, MT5)
+- ✅ Multi-account support (3+ prop firm accounts)
+- ✅ Advanced analytics (PF, E[R], drawdown)
+- ✅ Priority support
+
+**Target Users:**
+- Funded prop traders
+- Serious retail traders
+- Strategy developers
+
+**Revenue Model:**
+- $99/month: 1 account, 100 signals/day
+- $149/month: 3 accounts, 500 signals/day
+- $199/month: 10 accounts, unlimited signals
+
+---
+
+### **Enterprise Tier ($499-5k+/month)**
+**Architecture:**
+```
+┌─────────────────────────────┐
+│ White-label deployment      │ ← Custom branding
+│ (your-brand.transmission.ai)│
+└──────────┬──────────────────┘
+           │
+    ┌──────┴────────┬────────────┐
+    │               │            │
+┌───▼────┐     ┌────▼────┐  ┌───▼────┐
+│Custom  │     │  SDK    │  │Private │
+│  UI    │     │ Access  │  │  API   │
+└────────┘     └─────────┘  └────────┘
+```
+
+**What's included:**
+- ✅ All Pro features
+- ✅ White-label dashboard (custom branding)
+- ✅ SDK access (Python + REST)
+- ✅ Private deployment (dedicated infrastructure)
+- ✅ Custom engine development
+- ✅ Dedicated support (Slack channel)
+- ✅ Multi-broker support (live API keys)
+
+**Target Users:**
+- Strategy sellers (white-label for clients)
+- Small hedge funds/CTAs
+- Proprietary trading firms
+- Platform builders
+
+**Revenue Model:**
+- $499/month: SDK access, shared infrastructure
+- $999/month: White-label, dedicated resources
+- $5k+/month: Custom development, SLA, dedicated support
+
+---
+
+## Technical Architecture Recommendations
+
+### **1. Multi-Tenancy Design**
+
+**Current State:** Single-user orchestrator
+**Required:** User-isolated state management
+
+```python
+# transmission/orchestrator/manager.py
+class OrchestratorManager:
+    """Manages multiple orchestrators (one per user)"""
+
+    def __init__(self):
+        self._orchestrators: Dict[str, TransmissionOrchestrator] = {}
+        self._lock = asyncio.Lock()
+
+    async def get_orchestrator(self, user_id: str) -> TransmissionOrchestrator:
+        """Get or create orchestrator for user"""
+        async with self._lock:
+            if user_id not in self._orchestrators:
+                config = await self._load_user_config(user_id)
+                self._orchestrators[user_id] = TransmissionOrchestrator(config)
+            return self._orchestrators[user_id]
+
+    async def _load_user_config(self, user_id: str) -> Config:
+        """Load user-specific configuration from DB"""
+        # Each user has their own:
+        # - Risk limits (-2R day, -5R week)
+        # - Strategy preferences
+        # - Broker connections
+        # - Prop firm rules
+        pass
+
+# transmission/api/dependencies.py
+async def get_current_user(api_key: str = Header(...)) -> User:
+    """Validate API key and return user"""
+    user = await db.get_user_by_api_key(api_key)
+    if not user:
+        raise HTTPException(401, "Invalid API key")
+    return user
+
+# transmission/api/routes/signals.py
+@app.post("/api/v1/signals")
+async def process_signal(
+    signal: SignalInput,
+    user: User = Depends(get_current_user),
+    manager: OrchestratorManager = Depends(get_manager)
+):
+    """Each user has isolated orchestrator instance"""
+    orchestrator = await manager.get_orchestrator(user.id)
+    return await orchestrator.process_signal(signal)
+```
+
+**Benefits:**
+- Scales to thousands of users on single server
+- User data isolation (security/privacy)
+- Per-user configuration
+- Independent state management
+
+---
+
+### **2. Signal Adapter Abstraction**
+
+**Purpose:** Accept signals from ANY source, normalize to Transmission format
+
+```python
+# transmission/adapters/__init__.py
+from .base import SignalAdapter
+from .tradingview import TradingViewAdapter
+from .mt5 import MT5Adapter
+from .manual import ManualSignalAdapter
+
+ADAPTERS = {
+    "tradingview": TradingViewAdapter,
+    "mt5": MT5Adapter,
+    "manual": ManualSignalAdapter,
+}
+
+# transmission/models/signal.py
+@dataclass
+class Signal:
+    """Universal signal format (platform-agnostic)"""
+    symbol: str              # "ES", "NQ", "AAPL"
+    side: Literal["LONG", "SHORT"]
+    quantity: int            # Number of contracts/shares
+    strategy_name: str       # Which strategy generated this
+    timestamp: datetime
+    source: str              # "tradingview", "mt5", "manual"
+    metadata: dict           # Platform-specific extras
+
+# transmission/api/routes/signals.py
+@app.post("/api/v1/signals/{adapter_type}")
+async def process_external_signal(
+    adapter_type: str,
+    raw_signal: dict,
+    user: User = Depends(auth)
+):
+    """Route signal through appropriate adapter"""
+    if adapter_type not in ADAPTERS:
+        raise HTTPException(400, f"Unknown adapter: {adapter_type}")
+
+    adapter = ADAPTERS[adapter_type]()
+    signal = adapter.parse(raw_signal)
+
+    orchestrator = await get_orchestrator_for_user(user.id)
+    return await orchestrator.process_signal(signal)
+```
+
+---
+
+### **3. Database Schema for Multi-User**
+
+**Current:** Single SQLite file
+**Needed:** User-scoped tables
+
+```sql
+-- Users table
+CREATE TABLE users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    api_key TEXT UNIQUE NOT NULL,
+    tier TEXT CHECK(tier IN ('free', 'pro', 'enterprise')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User configs (per-user risk limits, strategies)
+CREATE TABLE user_configs (
+    user_id TEXT PRIMARY KEY REFERENCES users(id),
+    daily_loss_limit REAL DEFAULT -500.0,  -- -2R in dollars
+    weekly_loss_limit REAL DEFAULT -1250.0, -- -5R in dollars
+    max_position_size INT DEFAULT 2,
+    strategies_enabled TEXT,  -- JSON array of strategy names
+    broker_config TEXT        -- JSON broker settings
+);
+
+-- Trades (user-scoped)
+CREATE TABLE trades (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),  -- ← KEY: User isolation
+    symbol TEXT NOT NULL,
+    -- ... existing trade fields ...
+    INDEX idx_user_trades (user_id, timestamp)
+);
+
+-- API keys (support multiple keys per user)
+CREATE TABLE api_keys (
+    key TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id),
+    name TEXT,  -- "Production", "Testing", etc.
+    scopes TEXT,  -- JSON array of permissions
+    last_used TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+## Deployment Architecture
+
+### **MVP (Phase 1):** Self-Hosted
+```
+User's Machine:
+┌─────────────────────────┐
+│  Docker Compose         │
+│  ├─ FastAPI (port 8000) │
+│  ├─ React (port 5173)   │
+│  └─ SQLite (volume)     │
+└─────────────────────────┘
+```
+
+### **Pro Tier (Phase 2):** Cloud Hosted (Multi-Tenant)
+```
+Cloud (AWS/GCP/DO):
+┌──────────────────────────────┐
+│  Load Balancer               │
+└────────┬─────────────────────┘
+         │
+    ┌────▼────┐
+    │ FastAPI │ (Gunicorn + Uvicorn workers)
+    │ (3 pods)│
+    └────┬────┘
+         │
+    ┌────▼────────┐
+    │ PostgreSQL  │ (managed DB)
+    │ + TimescaleDB│
+    └─────────────┘
+
+CDN:
+┌──────────────┐
+│ React Build  │ (Vercel/Cloudflare)
+└──────────────┘
+```
+
+### **Enterprise (Phase 3):** Private Deployment
+```
+Client's VPC:
+┌─────────────────────────────┐
+│  Kubernetes Cluster         │
+│  ├─ transmission-api (pods) │
+│  ├─ postgresql (stateful)   │
+│  └─ redis (caching)         │
+└─────────────────────────────┘
+```
+
+---
+
+## Migration Path (Current MVP → Multi-User SaaS)
+
+### **Step 1: API Key Authentication**
+```python
+# transmission/api/middleware.py
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    if request.url.path.startswith("/api/v1/"):
+        api_key = request.headers.get("X-API-Key")
+        if not api_key:
+            return JSONResponse({"error": "Missing API key"}, 401)
+
+        user = await validate_api_key(api_key)
+        if not user:
+            return JSONResponse({"error": "Invalid API key"}, 401)
+
+        request.state.user = user  # Attach to request
+
+    return await call_next(request)
+```
+
+### **Step 2: User-Scoped Orchestrators**
+```python
+# transmission/orchestrator/manager.py (created above)
+# Replace global orchestrator with per-user instances
+```
+
+### **Step 3: Database Migration**
+```sql
+-- Add user_id to existing tables
+ALTER TABLE trades ADD COLUMN user_id TEXT;
+ALTER TABLE positions ADD COLUMN user_id TEXT;
+ALTER TABLE performance_metrics ADD COLUMN user_id TEXT;
+
+-- Migrate existing data to default user
+UPDATE trades SET user_id = 'default_user';
+```
+
+### **Step 4: Webhook Endpoints**
+```python
+# transmission/api/routes/webhooks.py (created in Phase 2)
+# Add TradingView, MT5 adapters
+```
+
+---
+
+## Revenue Projection (3-Tier Model)
+
+| Tier | Price/Month | Target Users (Year 1) | Annual Revenue |
+|------|-------------|------------------------|----------------|
+| Free (Open Source) | $0 | 1,000 users | $0 (lead gen) |
+| Pro | $149 | 100 users | $178,800 |
+| Enterprise | $999 | 5 users | $59,940 |
+| **TOTAL** | - | **1,105 users** | **$238,740** |
+
+**Assumptions:**
+- 10% conversion from Free → Pro
+- 5% conversion from Pro → Enterprise
+- Year 1 goals (conservative)
 
 ---
 
 ## Competitive Positioning
 
-### Why This Architecture Wins
+| Product | Model | Price | Transmission Advantage |
+|---------|-------|-------|------------------------|
+| **QuantConnect** | Cloud platform | $0-$200/mo | ✅ We're adaptive, they're static |
+| **TradingView Premium** | Charting + alerts | $15-60/mo | ✅ We execute + manage risk, they just alert |
+| **MetaTrader EAs** | Desktop plugins | $50-500 one-time | ✅ We're regime-aware, they're dumb bots |
+| **3Commas** | Crypto bots | $99/mo | ✅ We handle futures, multi-TF, prop rules |
+| **Hedge Fund Tools** | Enterprise software | $50k+/year | ✅ We're 1/100th the cost for retail/small firms |
 
-**1. Market Reach**
-- Dashboard → Direct users (prop traders, retail)
-- Webhooks → Platform users (TradingView, MT5)
-- SDK → Developers and enterprises
-
-**2. Flexibility**
-- Users choose their interface
-- No vendor lock-in
-- Works with existing workflows
-
-**3. Scalability**
-- Multi-tenant architecture from day one
-- Cloud-ready
-- Can scale to thousands of users
-
-**4. Revenue Diversification**
-- Free tier (open source) → Community growth
-- Pro tier → Recurring revenue
-- Enterprise → High-value customers
-
----
-
-## Risk Mitigation
-
-### Platform Dependency Risk
-
-**Problem:** Building plugins for TradingView/MT5 creates dependency  
-**Solution:** Webhook abstraction layer - if platform changes, only adapter needs update
-
-### Multi-Tenancy Complexity
-
-**Problem:** User isolation adds complexity  
-**Solution:** Start simple (separate databases), migrate to shared later
-
-### Revenue Concentration
-
-**Problem:** Too dependent on one tier  
-**Solution:** Three-tier model diversifies revenue streams
+**Your Moat:**
+- Only platform with **regime-adaptive** signal processing
+- Only platform with **prop firm compliance** baked in
+- Only platform with **multi-timeframe fusion** for entries
+- Only platform with **mental state protection**
 
 ---
 
 ## Success Metrics
 
-### Phase 1 (MVP) - ✅ Complete
+### **Phase 1 (MVP):** ✅ COMPLETE
+- [x] System runs without crashing
+- [x] All Tier-1 & Tier-2 modules implemented
+- [x] Dashboard shows live status
 - [x] 100% Blueprint compliance
-- [x] All Tier-1 & Tier-2 modules
-- [x] FastAPI backend
-- [x] React frontend
 
-### Phase 2 (Webhooks) - 📅 Q1 2025
-- [ ] 10 TradingView integrations
-- [ ] 5 MT5 integrations
-- [ ] 50 Pro users
-- [ ] $5k MRR
+### **Phase 2 (Webhook Integration):** Target Q1 2025
+- [ ] TradingView webhook processes 100+ signals/day
+- [ ] MT5 adapter live with 5+ beta users
+- [ ] 50% of new signups use webhook (not standalone)
+- [ ] Churn rate < 10%/month
 
-### Phase 3 (SDK) - 📅 Q2 2025
-- [ ] Python SDK released
-- [ ] 5 enterprise customers
-- [ ] $25k MRR
-- [ ] 200 total users
+### **Phase 3 (SDK Launch):** Target Q2 2025
+- [ ] SDK published to PyPI
+- [ ] 5+ enterprise customers using API
+- [ ] 100k+ API calls/month processed
+- [ ] Enterprise tier revenue > $5k/month
 
 ---
 
-## Conclusion
+## Risks & Mitigations
 
-**✅ APPROVED: Multi-Interface Middleware Platform**
-
-This architecture:
-- ✅ Maximizes market reach (all segments)
-- ✅ Minimizes platform risk (webhook abstraction)
-- ✅ Enables revenue diversification (three tiers)
-- ✅ Scales from MVP to enterprise
-
-**Next Action:** Implement multi-tenancy foundation and webhook infrastructure.
+| Risk | Impact | Probability | Mitigation |
+|------|--------|-------------|------------|
+| **Platform dependency (TV/MT5)** | High | Medium | Build abstraction layer, support multiple sources |
+| **Scaling costs (cloud hosting)** | Medium | High | Start with serverless, optimize before scaling |
+| **Competitive response** | High | Low | Move fast, build moat via regime intelligence |
+| **User data security** | Critical | Low | Multi-tenancy isolation, encryption, SOC2 compliance |
+| **Broker API reliability** | Medium | Medium | Fallback brokers, retry logic, monitoring |
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2024-12-19  
-**Status:** ✅ **APPROVED FOR IMPLEMENTATION**
+## Conclusion & Recommendation
 
+### **✅ BUILD AS: Multi-Interface Middleware Platform**
+
+**Rationale:**
+1. **Maximum Market Reach** - Dashboard (direct users) + Webhooks (platform users) + SDK (developers)
+2. **Revenue Diversification** - Free (lead gen) → Pro (SaaS) → Enterprise (custom)
+3. **Competitive Moat** - Only adaptive middleware with prop-firm compliance
+4. **Phased Risk** - Ship dashboard first (MVP), expand to webhooks/SDK later
+
+**Next Immediate Actions:**
+1. ✅ Harden current MVP (production-ready FastAPI + React)
+2. 📅 Design multi-tenancy architecture (user isolation, API keys)
+3. 📅 Build TradingView webhook adapter (unlocks 5M+ users)
+4. 📅 Launch Pro tier beta (10-20 paying customers)
+
+**Timeline:**
+- **Now - Month 3:** Production harden MVP, launch beta
+- **Month 4-6:** Webhook integration (TradingView, MT5)
+- **Month 7-12:** SDK launch, enterprise tier
+
+---
+
+## Additional Resources
+
+- **Blueprint:** [Product_Concept.txt](../BLUEPRINTS/Product_Concept.txt)
+- **Tech Stack:** [Tech_Stack_Concept.txt](../BLUEPRINTS/Tech_Stack_Concept.txt)
+- **Market Positioning:** [Product_Package_Concept.txt](../BLUEPRINTS/Product_Package_Concept.txt)
+- **Implementation Status:** [BLUEPRINT_ADHERENCE_REPORT.md](./BLUEPRINT_ADHERENCE_REPORT.md)
+
+---
+
+**Decision Owner:** Chris - Superior One Logistics
+**Last Updated:** 2025-11-13
+**Status:** ✅ Approved for implementation
