@@ -13,7 +13,7 @@ import uvicorn
 import os
 from datetime import datetime
 
-from transmission.api.routes import trades, metrics, system, signals
+from transmission.api.routes import trades, metrics, system, signals, webhooks
 from transmission.api.websocket import websocket_endpoint, set_orchestrator as set_ws_orchestrator
 from transmission.api.dependencies import set_orchestrator as set_dep_orchestrator
 from transmission.api.middleware import LoggingMiddleware, SecurityHeadersMiddleware
@@ -59,6 +59,7 @@ app.include_router(trades.router, prefix="/api")
 app.include_router(metrics.router, prefix="/api")
 app.include_router(system.router, prefix="/api")
 app.include_router(signals.router, prefix="/api")
+app.include_router(webhooks.router, prefix="/api")
 
 # WebSocket endpoint
 app.websocket("/ws")(websocket_endpoint)

@@ -75,7 +75,7 @@ def verify_api_key(api_key: str = Depends(api_key_header)) -> str:
             detail="Invalid API key"
         )
     
-    return user_id
+    return user_id  # Returns user_id, not api_key
 
 
 def create_api_key(user_id: str) -> str:
