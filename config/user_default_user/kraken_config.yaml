@@ -1,0 +1,17 @@
+# Kraken API Configuration
+# PAPER TRADING CREDENTIALS - SAFE TO COMMIT
+
+broker:
+  type: "kraken"
+  api_key: "lyLnVLqQ9HqCWt0zIXlt9Q16JIWWWjBNKHw13w/7dLkTDW0SOKTD+0NE"
+  private_key: "sEL6N1/xIX9uVbRYFl3as8HF3Ufj31yIPoMkDa6sUKWkXzzBL66Jvm1iykgpSx1arMQPlOGDyci28uRnOAmmiQ=="
+  sandbox: true  # Paper trading mode
+  testnet: true  # Use Kraken demo environment
+
+# Trading symbols (Kraken format)
+symbols:
+  - "BTC/USD:USD"   # Bitcoin futures
+  - "ETH/USD:USD"   # Ethereum futures
+
+# Default symbol for manual signals
+default_symbol: "BTC/USD:USD"

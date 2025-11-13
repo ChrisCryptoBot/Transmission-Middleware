@@ -25,10 +25,13 @@ from transmission.risk.smart_constraints import SmartConstraintEngine
 from transmission.risk.position_sizer import PositionSizer
 from transmission.strategies.base import BaseStrategy, Signal, Position
 from transmission.strategies.vwap_pullback import VWAPPullbackStrategy
+from transmission.strategies.orb_retest import ORBRetestStrategy
+from transmission.strategies.mean_reversion import MeanReversionStrategy
 from transmission.execution.guard import ExecutionGuard, ExecutionCheck
 from transmission.execution.engine import ExecutionEngine
 from transmission.execution.adapter import BrokerAdapter
 from transmission.execution.mock_broker import MockBrokerAdapter
+from transmission.execution.kraken_adapter import KrakenAdapter
 from transmission.execution.in_trade_manager import InTradeManager, TrailingStopConfig, TrailingStopMode, ScaleOutRule
 from transmission.telemetry.multi_tf_fusion import MultiTimeframeFusion
 from transmission.risk.mental_governor import MentalGovernor, MentalState
@@ -149,16 +152,30 @@ class TransmissionOrchestrator:
         # Broker & Execution Engine
         if broker is None:
             # Create broker adapter based on config
-            broker_mode = config.get('broker', {}).get('mode', 'mock')
-            if broker_mode == 'mock':
+            broker_type = config.get('broker', {}).get('type', 'mock')
+
+            if broker_type == 'mock':
                 mock_config = config.get('broker', {}).get('mock', {})
                 broker = MockBrokerAdapter(
                     slippage_ticks=mock_config.get('slippage_ticks', 0.5),
                     latency_ms=mock_config.get('latency_ms', 50.0),
                     fill_probability=mock_config.get('fill_probability', 1.0)
                 )
+                logger.info("Using MockBrokerAdapter")
+
+            elif broker_type == 'kraken':
+                kraken_config = config.get('broker', {})
+                broker = KrakenAdapter(
+                    api_key=kraken_config.get('api_key', ''),
+                    private_key=kraken_config.get('private_key', ''),
+                    sandbox=kraken_config.get('sandbox', True),
+                    testnet=kraken_config.get('testnet', True)
+                )
+                logger.info(f"Using KrakenAdapter (sandbox={kraken_config.get('sandbox', True)})")
+
             else:
-                # TODO: Add paper/live broker adapters
+                # Default to mock if unknown type
+                logger.warning(f"Unknown broker type '{broker_type}', defaulting to mock")
                 broker = MockBrokerAdapter()
         
         self.broker = broker
@@ -168,11 +185,11 @@ class TransmissionOrchestrator:
             guard=self.execution_guard
         )
         
-        # Strategies
+        # Strategies (regime-based strategy selection)
         self.strategies: Dict[str, BaseStrategy] = {
-            'TREND': VWAPPullbackStrategy(),
-            # 'RANGE': ORBRetestStrategy(),  # Will add in Week 2
-            # 'VOLATILE': MeanReversionStrategy(),  # Will add later
+            'TREND': VWAPPullbackStrategy(instrument_spec_service=self.instrument_spec),
+            'RANGE': ORBRetestStrategy(instrument_spec_service=self.instrument_spec),
+            'VOLATILE': MeanReversionStrategy(instrument_spec_service=self.instrument_spec),
         }
         
         self.current_strategy: Optional[BaseStrategy] = None
