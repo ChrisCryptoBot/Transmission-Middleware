@@ -1,3 +1,872 @@
+0. Mission (One Sentence)
+
+VEGUS helps any trader, in any market, with any account size, interpret markets like “the house” by turning complex data into odds, regimes (“gears”), and risk-aware, explainable guidance for buy/sell decisions.
+
+1. Target Users & Modes
+1.1 User Types
+
+VEGUS must serve:
+
+Beginners – small accounts, limited technical knowledge, want:
+
+simple yes/no or “good / okay / bad” signals
+
+clear explanations in plain language
+
+protection from overtrading & YOLO decisions
+
+Intermediate Traders – know basics, want:
+
+market context
+
+regime detection
+
+position sizing help
+
+strategy suggestions
+
+Advanced / Quant / Prop Traders – want:
+
+regime state
+
+odds & probabilities
+
+performance breakdowns
+
+execution analytics
+
+monitoring for bots/strategies
+
+1.2 Operational Modes
+
+VEGUS supports 3 interaction modes (same UI, different affordances):
+
+Manual Guidance Mode
+
+User executes trades themselves (on broker/platform).
+
+VEGUS provides:
+
+odds
+
+gear
+
+directional bias
+
+size recommendation
+
+risk warnings
+
+No trade execution from VEGUS.
+
+Assisted / Semi-Auto Mode
+
+VEGUS proposes trades based on its logic.
+
+User clicks “Confirm” / “Reject”.
+
+Backend sends orders via broker connector.
+
+Automated / Bot Mode
+
+Strategies run automatically on backend.
+
+VEGUS UI shows:
+
+running status
+
+current gear
+
+positions
+
+performance
+
+kill switch
+
+User configures risk thresholds, assets, schedules.
+
+Constraint for Cursor:
+UI must be designed so all 3 modes share the same core dashboard, with extra controls enabled/disabled per mode.
+
+2. Universality Requirements
+
+VEGUS must be asset-agnostic, market-agnostic, capital-agnostic, and trader-agnostic.
+
+2.1 Asset Classes (Supported / Planned)
+
+Stocks (single name, ETFs)
+
+Futures (micro/mini/full)
+
+Crypto (spot, perp swaps)
+
+Forex (major/minor pairs)
+
+Options (later, via separate view)
+
+Commodities (spot or via CFDs/futures)
+
+Indices (cash, CFD, futures, ETFs)
+
+2.2 Universal Data Abstractions
+2.2.1 UniversalBar
+
+All charting & indicator components use normalized bar data:
+
+type AssetClass =
+  | 'stocks'
+  | 'futures'
+  | 'crypto'
+  | 'forex'
+  | 'options'
+  | 'commodity'
+  | 'index';
+
+type SessionType = 'RTH' | 'ETH' | '24_7' | 'Premarket' | 'Afterhours';
+
+type UniversalBar = {
+  symbol: string;
+  assetClass: AssetClass;
+  timeframe: string; // e.g. '1m', '5m', '15m', '1h', '4h', '1d'
+
+  timestamp: string; // ISO8601, UTC, bar close time
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  vwap?: number | null;
+
+  exchange: string; // 'CME', 'NASDAQ', 'Binance', etc.
+  session: SessionType;
+
+  isComplete: boolean; // false if bar still forming
+  hasGap: boolean; // gap vs previous bar
+};
+
+
+Front-end rule:
+Charts, overlays, and indicators operate on UniversalBar[], never on broker-native candles directly.
+
+2.2.2 AssetConfig
+
+Each symbol gets a config describing its trading rules:
+
+type FeeModel = 'per_share' | 'per_contract' | 'bps_notional' | 'flat';
+
+type MarginProfile =
+  | 'cash'
+  | 'margin'
+  | 'futures_cross'
+  | 'futures_isolated'
+  | 'crypto_spot'
+  | 'crypto_derivative';
+
+type AssetConfig = {
+  symbol: string;
+  displaySymbol: string;
+  assetClass: AssetClass;
+
+  tickSize: number;
+  pointValue: number; // P&L per point / unit change
+
+  minOrderSize: number; // e.g. 0.001 BTC, 1 share, 1 micro lot
+  minOrderNotional: number; // min dollar value if relevant
+
+  allowsShort: boolean;
+  marginProfile: MarginProfile;
+
+  sessionHours: {
+    type: 'RTH' | '24_7' | 'CUSTOM';
+    openTimeLocal?: string; // '09:30'
+    closeTimeLocal?: string; // '16:00'
+    timezone?: string; // 'America/New_York'
+  };
+
+  feeModel: FeeModel;
+  feeRate?: number; // e.g. 0.0004 for 4 bps
+};
+
+
+Front-end rule:
+Position sizing controls & warnings must combine AccountConfig + AssetConfig to show:
+
+“This instrument is too large for your risk settings”
+
+“Min size is X, but your risk rule suggests smaller → show guidance.”
+
+3. Account & Capital Handling
+
+VEGUS must work for $100 accounts and $10M accounts.
+
+3.1 Account Configuration
+type AccountConfig = {
+  accountId: string;
+  baseCurrency: string; // 'USD', 'EUR', etc.
+  equity: number; // current total equity
+  maxRiskPerTradePct: number; // e.g. 0.5, 1.0, 2.0
+  maxDailyRiskR: number; // e.g. 2R
+  maxWeeklyRiskR: number; // e.g. 5R
+
+  propMode: boolean;
+  propRules?: {
+    dailyDrawdownLimitUsd: number;
+    maxPositions: number;
+    newsTradingAllowed: boolean;
+    overnightAllowed: boolean;
+  };
+};
+
+3.2 R-Based Risk Language
+
+R = risk per trade (stop distance × size).
+
+All stats (drawdown, daily loss, etc.) should show R values and $.
+
+Front-end rule:
+Risk UIs should display:
+
+Risk per trade: % and $
+
+Daily used risk: X.Y R and $
+
+Weekly used risk: X.Y R and $
+Not just “-432.19$”.
+
+4. Engine Mental Model (Front-End Needs to Reflect This)
+
+VEGUS has several state objects that drive the UI:
+
+4.1 RegimeState
+
+Represents current market environment:
+
+type RegimeState = {
+  symbol: string;
+  timeframe: string;
+
+  trendProb: number; // 0–1
+  rangeProb: number; // 0–1
+
+  volPercentile: number; // 0–100 (ATR percentile)
+  bbWidth: number; // relative to median (1.0 = median width)
+  adx: number; // 0–50+
+  vwapSlope: number; // % per bar or normalized slope
+
+  chopScore: number; // 0–1 (1 = very choppy)
+  liquidityScore: number; // 0–1
+  eventRiskScore: number; // 0–1 (news/macro)
+
+  lastUpdated: string; // ISO
+};
+
+4.2 DirectionalState
+
+Represents bullish/bearish bias:
+
+type DirectionLabel = 'bullish' | 'bearish' | 'neutral';
+
+type DirectionalState = {
+  symbol: string;
+  timeframe: string;
+
+  direction: DirectionLabel;
+  strength: number; // 0–1
+  htfAlignment: number; // 0–1, alignment across TFs
+  momentumScore: number; // 0–1
+
+  lastUpdated: string;
+};
+
+4.3 RiskState
+
+Represents current risk posture:
+
+type RiskState = {
+  accountId: string;
+
+  dailyRUsed: number; // e.g. 0.8R used
+  weeklyRUsed: number;
+
+  currentDrawdownPct: number;
+  maxDrawdownPct: number;
+
+  mentalRiskScore: number; // 0–1 (0 = calm, 1 = max stress)
+  propLimitHit: boolean;
+  blackSwanFlag: boolean; // flash crash, circuit breaker, etc.
+
+  lastUpdated: string;
+};
+
+4.4 ExecutionState
+
+Represents trade execution environment:
+
+type ExecutionState = {
+  symbol: string;
+
+  spreadBps: number;
+  spreadWidening: boolean;
+
+  slippageEstimateBps: number;
+  bookThin: boolean; // order book depth poor
+
+  apiLatencyMs: number;
+  connectionUnstable: boolean;
+
+  lastUpdated: string;
+};
+
+5. Gear System (Transmission Algorithm)
+
+The Gear Engine compresses all of the above into a:
+
+enum Gear {
+  RISK_OFF = 0,
+  SCALP = 1,
+  RANGE = 2,
+  MOMENTUM = 3,
+  TREND = 4,
+  HARVEST = 5, // optional, for post-trend mean reversion/fades
+}
+
+type GearDecision = {
+  symbol: string;
+
+  gear: Gear;
+  confidence: number; // 0–1
+  direction: DirectionLabel; // from DirectionalState
+
+  reasonTags: string[]; // e.g. ['TREND_HIGH', 'VOL_MED', 'RISK_PRESSURE_LOW']
+
+  // optionally for UI transparency:
+  componentScores?: {
+    trendScore: number;
+    rangeScore: number;
+    scalpScore: number;
+    momentumScore: number;
+    riskOffScore: number;
+  };
+
+  timestamp: string;
+};
+
+5.1 Conceptual Logic (for Cursor to know)
+
+Compute scores for:
+
+trend, range, scalp, momentum, risk-off
+
+Apply risk pressure adjustments:
+
+If risk is high → penalize aggressive gears (trend, scalp)
+
+Choose best regime
+→ Map regime → base gear (TREND → Gear.TREND, etc.)
+
+Apply hysteresis and dwell time:
+
+Don’t flip gears too often
+
+Require new regime score to beat old by a margin
+
+Apply hard overrides:
+
+Prop rule hit → RISK_OFF
+
+Execution crash → RISK_OFF
+
+Black swan event → RISK_OFF
+
+Front-end rule:
+UI must surface the final GearDecision and show:
+
+Gear
+
+Confidence
+
+Direction
+
+Reason tags
+in both top-level and detail views.
+
+6. VEGUS Score & House Odds
+
+VEGUS also outputs a single scalar “environment quality score”:
+
+type VegusScore = {
+  symbol: string;
+
+  score: number; // 0–100
+  label: 'Bad' | 'Caution' | 'Favorable' | 'Prime';
+  explanation: string; // plain-language summary
+
+  componentBreakdown: {
+    marketQuality: number; // 0–1
+    riskPressure: number;  // 0–1
+    executionQuality: number;
+    psychologicalSafety: number;
+  };
+
+  timestamp: string;
+};
+
+
+Front-end:
+This powers:
+
+A large circular gauge at top (“VEGUS Score”)
+
+Color-coded (red/yellow/green/dark-green)
+
+Short description of environment.
+
+7. Data Domains (Tables / Panels) – From Your Lists
+
+These drive analytics screens and performance dashboards.
+
+7.1 Trade Log
+
+Represents every closed trade:
+
+type TradeLogEntry = {
+  tradeId: string;
+
+  symbol: string;
+  tradeType: 'live' | 'paper' | 'backtest';
+  direction: 'long' | 'short';
+
+  entryTimestamp: string;
+  exitTimestamp: string;
+
+  entryPrice: number;
+  exitPrice: number;
+  stopLossPrice: number;
+  takeProfitPrice?: number;
+
+  portfolioEquityAtEntry: number;
+  positionSize: number; // in units/contracts
+  pnlAmount: number;
+  pnlPercent: number;
+  feesPaid: number;
+  netPnl: number;
+
+  holdingDurationSec: number;
+
+  strategyName: string;
+  strategyVersion: string;
+  strategyConfidenceScore?: number;
+
+  tradeTriggerSignal?: string;
+  entryVwapDistancePct?: number;
+  tradeSuccessProb?: number;
+  riskRewardRatio?: number;
+  winLoss: 'win' | 'loss' | 'breakeven';
+
+  marketConditionSnapshot?: string; // e.g. JSON string or reference ID
+
+  tradeExecutionLatencyMs?: number;
+  slippagePips?: number;
+  executionQualityScore?: number;
+
+  notes?: string;
+};
+
+7.2 Strategy Performance
+type StrategyPerformance = {
+  strategyName: string;
+  strategyVersion: string;
+  timePeriod: {
+    start: string;
+    end: string;
+  };
+
+  totalTrades: number;
+  winRate: number;
+  profitFactor: number;
+  avgWin: number;
+  avgLoss: number;
+  largestWin: number;
+  largestLoss: number;
+  avgHoldingTimeMin: number;
+
+  sharpe: number;
+  sortino: number;
+  maxDrawdown: number;
+  recoveryFactor: number;
+  calmar: number;
+  expectancy: number;
+  totalReturnPct: number;
+
+  bestMarketCondition: string; // e.g. 'TREND_HIGH_VOL'
+  bestSession: string; // 'AM', 'PM', 'Overnight'
+  strategyConsistencyScore: number;
+  parameterSensitivityScore: number; // 0–1
+  backtestVsLiveDriftPct: number;
+
+  performanceByRegime?: Record<string, number>; // per gear/regime
+};
+
+7.3 Market Conditions Snapshot
+type MarketConditionSnapshot = {
+  symbol: string;
+  timestamp: string;
+
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  vwap: number;
+
+  dailyVolatility: number;
+  hourlyVolatility: number;
+
+  rsi14: number;
+  macdHistogram: number;
+  bollingerWidth: number;
+  atr: number;
+
+  marketRegime: string; // 'TREND', 'RANGE', 'VOLATILE', etc.
+  supportLevel: number;
+  resistanceLevel: number;
+
+  sentimentScore: number; // -1 to 1
+  orderBookImbalance: number;
+  bidAskSpread: number;
+  liquidityDepth1Pct: number;
+  relativeVolume: number;
+
+  marketImpactCostEstimate: number;
+
+  correlationToSPX?: number;
+  correlationToETH?: number;
+
+  volumeMomentum1h: number;
+  priceMomentum1h: number;
+  liquidityShockFlag: boolean;
+};
+
+7.4 Risk Management Panel
+type RiskMetrics = {
+  timestamp: string;
+
+  portfolioValueAtRisk95: number;
+  conditionalVaR: number;
+  monteCarloVaR: number;
+  expectedShortfall: number;
+
+  totalRiskExposureUsd: number;
+  largestPositionRiskUsd: number;
+  concentrationRiskScore: number;
+
+  dailyVolatility: number;
+  correlationBetweenAssets: number;
+  sharpe30d: number;
+  sortino30d: number;
+  calmar30d: number;
+  maxDrawdown: number;
+  currentDrawdown: number;
+
+  positionSizingEfficiency: number;
+  riskPerTradeAdherence: number;
+  stopLossAdherence: number;
+  takeProfitAdherence: number;
+  riskRewardCompliance: number;
+
+  dynamicRiskAdjustmentFactor: number;
+  stressTestSurvivalRate: number;
+  riskViolationCount: number;
+  volatilityRegimeShift: boolean;
+  portfolioBeta: number;
+};
+
+7.5 Performance Analytics, Execution Quality, System Health & Backtest Results
+
+You’ve already given field lists; Cursor should treat them as schemas for their respective dashboards/tables.
+
+Front-end rule:
+Each of these domains maps to one or more React pages/tabs:
+
+Trade Log
+
+Strategy Performance
+
+Market Conditions
+
+Risk Management
+
+Performance Analytics
+
+Execution Quality
+
+System Health
+
+Backtest Results
+
+8. Core UI Layout & Components
+8.1 Top-Level Layout
+
+Structure:
+
+Top Navbar
+
+Logo (VEGUS)
+
+Account selector
+
+Mode indicator (Manual / Assisted / Auto)
+
+Notifications
+
+Left Sidebar
+
+Dashboard
+
+Odds / Transmission
+
+Strategies
+
+Analytics
+
+Risk
+
+Execution
+
+System Health
+
+Settings
+
+Main Content Area
+
+Default: “VEGUS Dashboard”
+
+8.2 VEGUS Dashboard (Main Screen)
+8.2.1 Top Row (overview)
+
+Components:
+
+VEGUS Score Gauge
+
+Shows VegusScore.score out of 100
+
+Color-coded:
+
+0–30: red (“Bad”)
+
+30–55: yellow (“Caution”)
+
+55–75: green (“Favorable”)
+
+75–100: dark green (“Prime”)
+
+Small text with VegusScore.explanation.
+
+Transmission Gear Dial
+
+Displays current GearDecision.gear:
+
+0 Risk-Off
+
+1 Scalp
+
+2 Range
+
+3 Momentum
+
+4 Trend
+
+5 Harvest
+
+Shows direction (bull/bear/neutral) via arrow/compass.
+
+Shows confidence (0–1) as ring intensity.
+
+Risk Meter
+
+Based on RiskState:
+
+Daily R used
+
+Weekly R used
+
+Drawdown
+
+Horizontal bar:
+
+Green → Yellow → Red
+
+Tooltip: “You’ve used X.Y R today / Z.Y R this week.”
+
+Execution Health Card
+
+Based on ExecutionState:
+
+Spread status
+
+Latency
+
+Book depth
+
+Shows “Good / Mixed / Poor” with description.
+
+8.2.2 Middle Row
+
+Market Environment Map
+
+A multi-timeframe grid showing:
+
+vol state
+
+trend strength
+
+liquidity
+
+range compression
+
+momentum
+
+Rows: current, 5m, 15m, 1h, HTF.
+
+Cells: color-coded.
+
+Price Chart with Overlays
+
+Based on UniversalBar[].
+
+Overlays:
+
+current gear shading
+
+support/resistance levels
+
+key signals (entries/exits)
+
+environment changes.
+
+8.2.3 Bottom Row – Tabs
+
+Tabs:
+
+Market
+
+Shows RegimeState and MarketConditionSnapshot values.
+
+Beginner mode: GOOD / OK / BAD tags.
+
+Advanced mode: full numbers.
+
+Strategy Odds
+
+For current gear & regime, shows:
+
+which strategies historically perform best
+
+their win rates, profit factor, expectancy in this regime.
+
+Indicates “Consider X, avoid Y in this environment.”
+
+Execution
+
+Details from ExecutionState + ExecutionQuality metrics.
+
+Explains execution risks & cost.
+
+Risk
+
+From RiskState + RiskMetrics.
+
+Shows risk budget gauges, violations, concentration warning.
+
+Psychology
+
+Uses RiskState.mentalRiskScore + streaks from TradeLog.
+
+Suggests cool-downs when necessary.
+
+Transmission Logs
+
+Shows why gear decisions were made:
+
+previous gear → new gear
+
+reasonTags
+
+componentScores
+
+Makes the engine explainable.
+
+9. Modes & Permissions (UI Behavior)
+
+Manual Mode:
+
+No “Execute” button.
+
+Only guidance + odds.
+
+Position size is a suggestion.
+
+Assisted Mode:
+
+On signal/gear-aligned conditions, UI shows:
+
+“Proposed Trade Card”: direction, size, entry/stop/TP, gear reasoning.
+
+User clicks confirm → backend executes.
+
+Must list:
+
+projected R
+
+reasonTags
+
+current risk and environment quality.
+
+Automated Mode:
+
+Show:
+
+Bot status (Running / Paused / Error)
+
+Last N trades
+
+Current exposures
+
+Kill switch
+
+Gear + VEGUS Score still visible as context.
+
+10. Explainability Requirements
+
+Every significant UI element should be hover-explainable:
+
+VEGUS Score → explain components contributing to it.
+
+Gear → show which conditions triggered it.
+
+Risk Meter → show daily/weekly R usage, limits.
+
+Strategy Odds → show base stats (win rate, profit factor in regime).
+
+Execution Health → show spread, latency, depth.
+
+Design requirement:
+Cursor must generate tooltips / info panels that pull from reasonTags, componentScores, and state objects to produce natural-language explanations.
+
+11. Error / Edge Cases
+
+The UI must gracefully handle:
+
+No data / slow data – show “Waiting for data…” with fallback safe state (Gear: RISK_OFF, VEGUS Score greyed).
+
+Backend unreachable – show non-intrusive error banner and disable execution/semi-auto features.
+
+Account too small – show friendly guidance, not hard errors (e.g. suggest smaller instruments).
+
+Incompatible asset – for unsupported features (e.g. options analytics not wired yet), show “Coming soon / not available for this asset yet”.
+
+12. Styling & UX Notes (for Cursor)
+
 Optimize the frontend design using modern CSS and design principles:
 
 ## Visual Design System
@@ -112,3 +981,25 @@ Optimize the frontend design using modern CSS and design principles:
 - Ensure sufficient contrast in both modes
 
 Apply these principles consistently across all components while maintaining a cohesive brand identity.
+
+Dark-mode first theme.
+
+Sleek, “quant dashboard meets casino odds board” aesthetic.
+
+Colors:
+
+Primary: deep blue / slate backgrounds
+
+Indicators: green, yellow, red, purple for special events
+
+Animations:
+
+Smooth, minimal; e.g., gear dial rotates, odds gauge animates when updating.
+
+Must be responsive (desktop priority, tablet acceptable, mobile later).
+
+13. Summary for Cursor Prompting
+
+If you want a one-liner to precede all of this:
+
+“You are building VEGUS – a universal trading transmission and house-odds dashboard. It must ingest normalized market state (RegimeState, DirectionalState, RiskState, ExecutionState), output gears and VEGUS Score, and present a beautiful, explainable UI for any asset, any trader, any capital size. Use the following spec as the complete source of truth for data models, components, modes, and behavior.”

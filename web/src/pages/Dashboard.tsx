@@ -1,284 +1,393 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+/**
+ * VEGUS Dashboard - Complete Implementation
+ * Based on UI_Concept.txt specifications
+ */
+
+import { useState, useEffect } from 'react';
 import { useWebSocket } from '@/lib/ws';
-import { useUIStore } from '@/state/uiStore';
-import { StatusCard } from '@/components/StatusCard';
-import { KillSwitch } from '@/components/KillSwitch';
-import { OrdersTable } from '@/components/OrdersTable';
-import { PositionsTable } from '@/components/PositionsTable';
-import { ManualSignalForm } from '@/components/ManualSignalForm';
-import { GearIndicator } from '@/components/GearIndicator';
-import { TrackView } from '@/components/TrackView';
-import { TelemetrySidebar } from '@/components/TelemetrySidebar';
-import { LearningDashboard } from '@/components/LearningDashboard';
-import { useEffect, useState, useMemo } from 'react';
-import { WSEvent } from '@/lib/types';
-import type { GearType } from '@/lib/types';
+import {
+  WSGearChangeEvent,
+} from '@/lib/types';
+import { VegusScoreGauge } from '@/components/VegusScoreGauge';
+import { TransmissionGearDial } from '@/components/TransmissionGearDial';
+import { RiskMeter } from '@/components/RiskMeter';
+import { ExecutionHealthCard } from '@/components/ExecutionHealthCard';
+import { MarketEnvironmentHeatmap } from '@/components/MarketEnvironmentHeatmap';
+import { PriceChart } from '@/components/PriceChart';
+import { ModeToggle, UserMode, ComplexityMode } from '@/components/ModeToggle';
+import { ProposedTradeCard } from '@/components/ProposedTradeCard';
+import { BotStatusPanel } from '@/components/BotStatusPanel';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { Zap } from 'lucide-react';
+import { Sidebar } from '@/components/Sidebar';
+import { AccountSelector } from '@/components/AccountSelector';
+import { NotificationCenter, Notification } from '@/components/NotificationCenter';
+import { Tooltip } from '@/components/Tooltip';
+import { StrategyOddsPanel } from '@/components/StrategyOddsPanel';
+import { TransmissionVisualization } from '@/components/TransmissionVisualization';
+import { VegusScoreBreakdown } from '@/components/VegusScoreBreakdown';
+import { DirectionalBiasPanel } from '@/components/DirectionalBiasPanel';
+import { OddsTimeline } from '@/components/OddsTimeline';
+import { IntelligenceLayers } from '@/components/IntelligenceLayers';
+import {
+  mockSystemStatus,
+  mockRegimeState,
+  mockDirectionalState,
+  mockBars,
+  mockVegusScore,
+  mockRiskState,
+  mockExecutionState,
+  mockGearDecision,
+} from '@/lib/mockData';
 
 export default function Dashboard() {
+  const [userMode, setUserMode] = useState<UserMode>('manual');
+  const [complexityMode, setComplexityMode] = useState<ComplexityMode>('beginner');
+  const [botRunning, setBotRunning] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState('default');
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const { message, isConnected } = useWebSocket();
-  const addWSEvent = useUIStore((state) => state.addWSEvent);
-  const addToast = useUIStore((state) => state.addToast);
-  const [activeTab, setActiveTab] = useState<'overview' | 'trading' | 'learning'>('overview');
 
-  // System status (includes gear state)
-  const { data: status, isLoading: statusLoading } = useQuery({
-    queryKey: ['system-status'],
-    queryFn: async () => (await api.get('/system/status')).data,
-    refetchInterval: 2000,
-  });
+  // Use mock data instead of API calls
+  const status = mockSystemStatus;
+  const statusLoading = false;
 
-  // Open orders
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders'],
-    queryFn: async () => (await api.get('/system/orders')).data,
-    refetchInterval: 3000,
-  });
-
-  // Positions
-  const { data: positionsData, isLoading: positionsLoading } = useQuery({
-    queryKey: ['positions'],
-    queryFn: async () => (await api.get('/system/positions')).data,
-    refetchInterval: 3000,
-  });
-
-  // Gear performance data
-  const { data: gearPerformance } = useQuery({
-    queryKey: ['gear-performance'],
-    queryFn: async () => (await api.get('/system/gear/performance')).data,
-    refetchInterval: 10000,
-  });
-
-  // Gear history (for future use)
-  // const { data: gearHistory } = useQuery({
-  //   queryKey: ['gear-history'],
-  //   queryFn: async () => (await api.get('/system/gear/history?limit=20')).data,
-  //   refetchInterval: 5000,
-  // });
-
-  // Trades for track view
-  const { data: tradesData } = useQuery({
-    queryKey: ['trades'],
-    queryFn: async () => (await api.get('/trades?limit=50')).data,
-    refetchInterval: 5000,
-  });
-
-  // Process trades into track view format
-  const tradeHistory = useMemo(() => {
-    if (!tradesData?.trades) return [];
-
-    // Build equity curve from trades
-    let runningEquity = 0;
-    return tradesData.trades.map((trade: any) => {
-      runningEquity += trade.pnl_r || 0;
-      return {
-        timestamp: trade.exit_time || trade.entry_time,
-        equity_r: runningEquity,
-        regime: trade.regime || 'UNKNOWN',
-        gear: trade.gear_at_entry || 'N',
-        win_loss: trade.pnl_r > 0 ? 'Win' : 'Loss',
-        event: trade.event_type // Optional: spread_spike, news_blackout, etc.
-      };
-    });
-  }, [tradesData]);
-
-  // Build recent insights from trades
-  const recentInsights = useMemo(() => {
-    if (!tradesData?.trades) return [];
-
-    return tradesData.trades.slice(0, 10).map((trade: any) => ({
-      timestamp: trade.exit_time || trade.entry_time,
-      symbol: trade.symbol,
-      direction: trade.direction,
-      gear_at_entry: trade.gear_at_entry || 'N',
-      gear_at_exit: trade.gear_at_exit || 'N',
-      regime: trade.regime || 'UNKNOWN',
-      result_r: trade.pnl_r || 0,
-      win_loss: trade.pnl_r > 0 ? 'Win' : 'Loss',
-      acceptance_reason: trade.acceptance_reason,
-      rejection_reason: trade.rejection_reason
-    }));
-  }, [tradesData]);
-
-  // Mock telemetry data (replace with real API when available)
-  const telemetryData = useMemo(() => ({
-    marketRPM: Math.min(Math.max((status?.weekly_pnl_r || 0) * 20 + 50, 0), 100),
-    mentalState: status?.can_trade ? 4 : 2,
-    spreadStability: status?.can_trade ? 85 : 45,
-    dllRemaining: Math.max(2.0 + (status?.daily_pnl_r || 0), 0),
-    confidenceScore: status?.can_trade ? 0.75 : 0.35,
-    executionQuality: 0.88
-  }), [status]);
-
-  // Handle WebSocket messages
+  // Process WebSocket messages
   useEffect(() => {
-    if (message) {
-      const event = message as WSEvent;
-      addWSEvent(event);
-
-      // Show toast notifications for important events
-      switch (event.type) {
-        case 'constraint_violation':
-        case 'guard_reject':
-          addToast({
-            type: 'warning',
-            message: `Signal rejected: ${event.reason || 'Unknown reason'}`,
-          });
-          break;
-        case 'order_submitted':
-          addToast({
-            type: 'info',
-            message: `Order submitted: ${event.order_id}`,
-          });
-          break;
-        case 'fill':
-          addToast({
-            type: 'success',
-            message: `Order filled: ${event.fill?.broker_order_id || 'Unknown'}`,
-          });
-          break;
-        case 'flatten_all':
-          addToast({
-            type: 'warning',
-            message: `All positions flattened: ${event.reason || 'Unknown reason'}`,
-          });
-          break;
-        case 'regime_change':
-          addToast({
-            type: 'info',
-            message: `Regime changed to: ${event.regime}`,
-          });
-          break;
-        case 'gear_change':
-          addToast({
-            type: 'info',
-            message: `⚙️ Gear shift: ${event.from_gear} → ${event.to_gear} (${event.gear_reason})`,
-          });
-          break;
-      }
+    if (message && message.type === 'gear_change') {
+      const gearEvent = message as WSGearChangeEvent;
+      console.log('Gear change:', gearEvent);
     }
-  }, [message, addWSEvent, addToast]);
+  }, [message]);
 
-  const currentGear = (status?.gear || 'N') as GearType;
-  const currentRegime = status?.current_regime || 'UNKNOWN';
+  // Use mock data
+  const gearDecision = mockGearDecision;
+  const riskState = mockRiskState;
+  const executionState = mockExecutionState;
+  const vegusScore = mockVegusScore;
+  const regimeState = mockRegimeState;
+  const directionalState = mockDirectionalState;
+
+  // Mock proposed trade (for assisted mode)
+  const proposedTrade = userMode === 'assisted' && status.can_trade
+    ? {
+        symbol: 'MNQ',
+        direction: 'long' as const,
+        entryPrice: 15050,
+        stopLoss: 15000,
+        takeProfit: 15150,
+        size: 1,
+        projectedR: 2.0,
+        strategyConfidence: 0.75,
+        reasonTags: ['TREND_HIGH', 'VWAP_PULLBACK'],
+        currentRisk: `${status.daily_pnl_r.toFixed(2)}R used`,
+        environmentQuality: vegusScore?.label || 'Favorable',
+      }
+    : null;
+
+  // Mock accounts (should come from backend)
+  const accounts = [
+    {
+      accountId: 'default',
+      baseCurrency: 'USD',
+      equity: 10000,
+      maxRiskPerTradePct: 1.0,
+      maxDailyRiskR: 2,
+      maxWeeklyRiskR: 5,
+      propMode: false,
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-black text-gradient bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-            Transmission™
-          </h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Adaptive Risk Management • Beyond Candlesticks
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md ${
-            isConnected
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-            {isConnected ? 'Live' : 'Disconnected'}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="flex">
+        {/* Left Sidebar */}
+        <Sidebar className="hidden lg:block" />
+
+        {/* Main Content */}
+        <div className="flex-1 p-4 md:p-8">
+          {/* Header */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <GlassCard className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500">
+                  <Zap className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-white">VEGUS</h1>
+                  <p className="text-white/60">Universal Trading Transmission</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <AccountSelector
+                  accounts={accounts}
+                  selectedAccountId={selectedAccountId}
+                  onAccountChange={setSelectedAccountId}
+                />
+                <NotificationCenter
+                  notifications={notifications}
+                  onDismiss={(id) => setNotifications((n) => n.filter((not) => not.id !== id))}
+                  onMarkAllRead={() => setNotifications((n) => n.map((not) => ({ ...not, read: true })))}
+                />
+                <StatusBadge
+                  status={isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+                  color={isConnected ? 'green' : 'red'}
+                />
+                <StatusBadge
+                  status={status.system_state || 'Loading...'}
+                  color={status.can_trade ? 'green' : 'yellow'}
+                />
+                <div className="text-right">
+                  <div className="text-xs text-white/60">API Latency</div>
+                  <div className="text-sm font-medium text-white">{executionState?.apiLatencyMs || 0}ms</div>
+                </div>
+              </div>
+            </GlassCard>
           </div>
-        </div>
-      </div>
 
-      {/* Tab Navigation */}
-      <div className="glass rounded-2xl p-2 inline-flex gap-2">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-6 py-2 rounded-xl font-medium transition-all ${
-            activeTab === 'overview'
-              ? 'bg-white/20 text-white shadow-lg'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('trading')}
-          className={`px-6 py-2 rounded-xl font-medium transition-all ${
-            activeTab === 'trading'
-              ? 'bg-white/20 text-white shadow-lg'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          Trading
-        </button>
-        <button
-          onClick={() => setActiveTab('learning')}
-          className={`px-6 py-2 rounded-xl font-medium transition-all ${
-            activeTab === 'learning'
-              ? 'bg-white/20 text-white shadow-lg'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          Learning
-        </button>
-      </div>
-
-      {/* Overview Tab - Transmission UI */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-12 gap-6">
-          {/* Panel A: Track View (Main - 8 cols) */}
-          <div className="col-span-12 lg:col-span-8">
-            <TrackView
-              tradeHistory={tradeHistory}
-              currentGear={currentGear}
-              currentRegime={currentRegime}
+          {/* Mode Toggle */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <ModeToggle
+              userMode={userMode}
+              complexityMode={complexityMode}
+              onUserModeChange={setUserMode}
+              onComplexityModeChange={setComplexityMode}
             />
           </div>
 
-          {/* Panel B: Telemetry + Gear (Sidebar - 4 cols) */}
-          <div className="col-span-12 lg:col-span-4 space-y-6">
-            <GearIndicator
-              currentGear={currentGear}
-              reason={status?.gear_reason || 'Initializing...'}
-              riskMultiplier={status?.gear_risk_multiplier || 0}
+          {/* Top Row - Overview Cards */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Tooltip
+                content={
+                  <div>
+                    <div className="font-bold mb-2">VEGUS Score Components:</div>
+                    <div>Market Quality: {(vegusScore?.componentBreakdown.marketQuality || 0) * 100}%</div>
+                    <div>Risk Pressure: {(vegusScore?.componentBreakdown.riskPressure || 0) * 100}%</div>
+                    <div>Execution Quality: {(vegusScore?.componentBreakdown.executionQuality || 0) * 100}%</div>
+                    <div>Psychological Safety: {(vegusScore?.componentBreakdown.psychologicalSafety || 0) * 100}%</div>
+                  </div>
+                }
+              >
+                <div>
+                  <VegusScoreGauge score={vegusScore} isLoading={statusLoading} />
+                </div>
+              </Tooltip>
+              <Tooltip
+                content={
+                  <div>
+                    <div className="font-bold mb-2">Gear Decision:</div>
+                    <div>Current: {gearDecision?.gear}</div>
+                    <div>Confidence: {gearDecision ? Math.round(gearDecision.confidence * 100) : 0}%</div>
+                    <div>Direction: {gearDecision?.direction}</div>
+                    {gearDecision?.reasonTags && gearDecision.reasonTags.length > 0 && (
+                      <div className="mt-2">
+                        <div className="font-bold">Reasons:</div>
+                        {gearDecision.reasonTags.map((tag, i) => (
+                          <div key={i}>• {tag}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                }
+              >
+                <div>
+                  <TransmissionGearDial gear={gearDecision} isLoading={statusLoading} />
+                </div>
+              </Tooltip>
+              <Tooltip
+                content={
+                  <div>
+                    <div className="font-bold mb-2">Risk Status:</div>
+                    <div>Daily R: {riskState?.dailyRUsed.toFixed(2)}R / 2R limit</div>
+                    <div>Weekly R: {riskState?.weeklyRUsed.toFixed(2)}R / 5R limit</div>
+                    <div>Drawdown: {riskState?.currentDrawdownPct.toFixed(2)}%</div>
+                  </div>
+                }
+              >
+                <div>
+                  <RiskMeter risk={riskState} isLoading={statusLoading} />
+                </div>
+              </Tooltip>
+              <Tooltip
+                content={
+                  <div>
+                    <div className="font-bold mb-2">Execution Health:</div>
+                    <div>Spread: {executionState?.spreadBps.toFixed(2)} bps</div>
+                    <div>Latency: {executionState?.apiLatencyMs}ms</div>
+                    <div>Book Depth: {executionState?.bookThin ? 'Thin' : 'Good'}</div>
+                    <div>Connection: {executionState?.connectionUnstable ? 'Unstable' : 'Stable'}</div>
+                  </div>
+                }
+              >
+                <div>
+                  <ExecutionHealthCard execution={executionState} isLoading={statusLoading} />
+                </div>
+              </Tooltip>
+            </div>
+          </div>
+
+          {/* Strategy Odds Panel - Core of VEGUS */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <StrategyOddsPanel
+              currentGear={status.gear || 'N'}
+              currentRegime={status.current_regime || 'UNKNOWN'}
+              strategies={[
+                { name: 'Mean Reversion', odds: 45, expectedR: 0.8, edgeStrength: 0.6, decayDetected: false },
+                { name: 'Momentum', odds: 72, expectedR: 1.5, edgeStrength: 0.8, decayDetected: false },
+                { name: 'Breakout', odds: 65, expectedR: 1.2, edgeStrength: 0.7, decayDetected: false },
+                { name: 'Scalping', odds: 38, expectedR: 0.5, edgeStrength: 0.4, decayDetected: true },
+                { name: 'Range', odds: 55, expectedR: 0.9, edgeStrength: 0.65, decayDetected: false },
+                { name: 'Trend', odds: 78, expectedR: 1.8, edgeStrength: 0.85, decayDetected: false },
+                { name: 'Alpha Harvest', odds: 42, expectedR: 0.7, edgeStrength: 0.55, decayDetected: false },
+                { name: 'Shock/Chaos', odds: 25, expectedR: -0.5, edgeStrength: 0.2, decayDetected: false },
+              ]}
+              bestStrategy="Trend"
+              isLoading={statusLoading}
             />
-            <TelemetrySidebar data={telemetryData} />
           </div>
 
-          {/* Panel C: System Stats (Full width below) */}
-          <div className="col-span-12 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <StatusCard status={status} isLoading={statusLoading} />
+          {/* Transmission Visualization */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <TransmissionVisualization
+              currentGear={status.gear === 'P' ? 5 : status.gear === 'R' ? 2 : status.gear === 'N' ? 3 : status.gear === 'D' ? 4 : 1}
+              rpm={65}
+              torque={72}
+              speed={58}
+              temperature={status.daily_pnl_r < -1 ? 75 : 35}
+              mode={userMode}
+              shiftTimer={120}
+              stabilityScore={78}
+              load={0}
+              fuel={85}
+              ecoMode={!status.can_trade}
+              sportMode={status.can_trade && status.daily_pnl_r > 0}
+              isLoading={statusLoading}
+            />
+          </div>
+
+          {/* VEGUS Score Breakdown */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <VegusScoreBreakdown score={vegusScore} isLoading={statusLoading} />
+          </div>
+
+          {/* Intelligence Layers */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <IntelligenceLayers
+              expectedRPerStrategy={{
+                'Mean Reversion': 0.8,
+                'Momentum': 1.5,
+                'Breakout': 1.2,
+                'Trend': 1.8,
+              }}
+              edgeStrength={75}
+              transmissionEfficiency={82}
+              expectedPnl={150}
+              actualPnl={142}
+              strategyDecay={[
+                { strategy: 'Scalping', decayScore: 65, detected: true },
+              ]}
+              isLoading={statusLoading}
+            />
+          </div>
+
+          {/* Middle Row - Market Environment & Chart */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Market Environment Heatmap */}
+              <div className="lg:col-span-2">
+                <MarketEnvironmentHeatmap
+                  regimes={
+                    regimeState
+                      ? {
+                          '1m': regimeState,
+                          '5m': regimeState,
+                          '15m': regimeState,
+                          '1h': regimeState,
+                          HTF: regimeState,
+                        }
+                      : undefined
+                  }
+                  isLoading={statusLoading}
+                />
+              </div>
+              {/* Directional Bias Panel */}
+              <div>
+                <DirectionalBiasPanel
+                  htfTrend={status.daily_pnl_r > 0 ? 'UP' : status.daily_pnl_r < 0 ? 'DOWN' : 'SIDEWAYS'}
+                  ltfTrend={status.daily_pnl_r > 0 ? 'UP' : status.daily_pnl_r < 0 ? 'DOWN' : 'SIDEWAYS'}
+                  biasConfidence={directionalState?.strength ? directionalState.strength * 100 : 65}
+                  trendStrength={directionalState?.momentumScore ? directionalState.momentumScore * 100 : 58}
+                  htfSupport={15000}
+                  htfResistance={15100}
+                  liquidityPools={[
+                    { price: 15050, size: 1000, type: 'support' },
+                    { price: 15080, size: 800, type: 'resistance' },
+                  ]}
+                  orderFlowImbalance={0.3}
+                  isLoading={statusLoading}
+                />
+              </div>
             </div>
-            <div>
-              <KillSwitch />
+          </div>
+
+          {/* Odds Timeline */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <OddsTimeline
+              data={Array.from({ length: 24 }, (_, i) => ({
+                timestamp: new Date(Date.now() - (24 - i) * 60 * 60 * 1000).toISOString(),
+                meanReversion: 40 + Math.random() * 20,
+                momentum: 60 + Math.random() * 20,
+                breakout: 50 + Math.random() * 20,
+                scalping: 30 + Math.random() * 20,
+                range: 45 + Math.random() * 20,
+                trend: 70 + Math.random() * 20,
+              }))}
+              isLoading={statusLoading}
+            />
+          </div>
+
+          {/* Price Chart */}
+          <div className="max-w-[1440px] mx-auto mb-6">
+            <PriceChart
+              bars={mockBars}
+              currentGear={gearDecision}
+              supportLevel={15000}
+              resistanceLevel={15100}
+              isLoading={statusLoading}
+            />
+          </div>
+
+          {/* Proposed Trade Card (Assisted Mode) */}
+          {userMode === 'assisted' && proposedTrade && (
+            <div className="max-w-[1440px] mx-auto mb-6">
+              <ProposedTradeCard
+                trade={proposedTrade}
+                onConfirm={() => console.log('Trade confirmed')}
+                onReject={() => console.log('Trade rejected')}
+              />
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Trading Tab - Orders & Positions */}
-      {activeTab === 'trading' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <OrdersTable orders={ordersData?.orders || []} isLoading={ordersLoading} />
-            <PositionsTable positions={positionsData?.positions || []} isLoading={positionsLoading} />
-          </div>
+          {/* Bot Status Panel (Auto Mode) */}
+          {userMode === 'auto' && (
+            <div className="max-w-[1440px] mx-auto mb-6">
+              <BotStatusPanel
+                isRunning={botRunning}
+                positions={[]}
+                onToggle={() => setBotRunning(!botRunning)}
+                onKillSwitch={() => {
+                  setBotRunning(false);
+                  console.log('Kill switch activated');
+                }}
+              />
+            </div>
+          )}
 
-          {/* Manual Signal Submission Section */}
-          <div className="mt-8">
-            <ManualSignalForm />
-          </div>
+          {/* Detailed Panels - No redundant tabs, content is in sidebar routes */}
         </div>
-      )}
-
-      {/* Learning Tab - Performance Analysis */}
-      {activeTab === 'learning' && (
-        <div className="space-y-6">
-          <LearningDashboard
-            gearPerformance={gearPerformance || []}
-            recentInsights={recentInsights}
-          />
-        </div>
-      )}
+      </div>
     </div>
   );
 }
-

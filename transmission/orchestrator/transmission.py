@@ -191,9 +191,9 @@ class TransmissionOrchestrator:
         
         # Strategies (regime-based strategy selection)
         self.strategies: Dict[str, BaseStrategy] = {
-            'TREND': VWAPPullbackStrategy(instrument_spec_service=self.instrument_spec),
-            'RANGE': ORBRetestStrategy(instrument_spec_service=self.instrument_spec),
-            'VOLATILE': MeanReversionStrategy(instrument_spec_service=self.instrument_spec),
+            'TREND': VWAPPullbackStrategy(),
+            'RANGE': ORBRetestStrategy(),
+            'VOLATILE': MeanReversionStrategy(),
         }
         
         self.current_strategy: Optional[BaseStrategy] = None
@@ -444,7 +444,14 @@ class TransmissionOrchestrator:
 
             # Step 3.5: Gear State Calculation (NEW - Transmission Visualization)
             gear_context = self._build_gear_context(regime=signal.regime if hasattr(signal, 'regime') else None)
+            
+            # Store previous gear to detect shifts
+            previous_gear = self.gear_state_machine.get_current_gear()
+            
             current_gear, gear_reason = self.gear_state_machine.shift(gear_context)
+            
+            # Broadcast gear change if shift occurred (via gear state machine's WebSocket manager)
+            # The gear_state_machine will handle broadcasting if WebSocket manager is set
 
             logger.info(f"Current gear: {current_gear.value} ({gear_reason})")
 

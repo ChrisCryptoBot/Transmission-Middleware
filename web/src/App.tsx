@@ -1,58 +1,36 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+/**
+ * VEGUS App - Main Application Component
+ */
+
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Dashboard from './pages/Dashboard';
-import Trades from './pages/Trades';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
+      staleTime: 5000,
     },
   },
 });
 
 function App() {
-
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <div className="min-h-screen bg-background">
-          {/* Navigation */}
-          <nav className="border-b">
-            <div className="container mx-auto px-4 py-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                  <Link to="/" className="text-xl font-bold">
-                    Beyond Candlesticks
-                  </Link>
-                  <div className="flex gap-4">
-                    <Link
-                      to="/"
-                      className="text-sm font-medium text-muted-foreground hover:text-foreground"
-                    >
-                      Dashboard
-                    </Link>
-                    <Link
-                      to="/trades"
-                      className="text-sm font-medium text-muted-foreground hover:text-foreground"
-                    >
-                      Trades
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </nav>
-
-          {/* Main Content */}
-          <main>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/trades" element={<Trades />} />
-            </Routes>
-          </main>
-        </div>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/transmission" element={<Dashboard />} />
+          <Route path="/strategies" element={<Dashboard />} />
+          <Route path="/analytics" element={<Dashboard />} />
+          <Route path="/risk" element={<Dashboard />} />
+          <Route path="/execution" element={<Dashboard />} />
+          <Route path="/system" element={<Dashboard />} />
+          <Route path="/settings" element={<Dashboard />} />
+        </Routes>
       </BrowserRouter>
     </QueryClientProvider>
   );

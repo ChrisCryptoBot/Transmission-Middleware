@@ -13,7 +13,7 @@ from decimal import Decimal
 
 import ccxt.async_support as ccxt
 
-from .adapter import BrokerAdapter, Order, Position, Fill
+from .adapter import BrokerAdapter, OrderReq, OrderResp, Position, Fill
 
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class KrakenAdapter(BrokerAdapter):
             logger.warning("Kraken adapter initialized in LIVE mode")
 
         # Internal state
-        self._orders: Dict[str, Order] = {}
+        self._orders: Dict[str, OrderResp] = {}
         self._positions: Dict[str, Position] = {}
         self._fills: List[Fill] = []
         self._connected = False
@@ -102,7 +102,7 @@ class KrakenAdapter(BrokerAdapter):
         self._connected = False
         logger.info("Disconnected from Kraken")
 
-    async def submit(self, order: Order) -> str:
+    async def submit(self, order: OrderReq) -> OrderResp:
         """
         Submit order to Kraken.
 
@@ -116,40 +116,47 @@ class KrakenAdapter(BrokerAdapter):
 
         try:
             # Map order type
-            order_type = 'market' if order.order_type == 'MARKET' else 'limit'
-            side = order.side.lower()  # 'buy' or 'sell'
+            order_type = 'market' if order['order_type'] == 'MKT' else 'limit'
+            side = order['side'].lower()  # 'buy' or 'sell'
 
             # Submit order via ccxt
             params = {}
-            if order.order_type == 'LIMIT':
+            if order['order_type'] == 'LMT':
                 result = await self.exchange.create_order(
-                    symbol=order.symbol,
+                    symbol=order['symbol'],
                     type=order_type,
                     side=side,
-                    amount=order.quantity,
-                    price=order.price,
+                    amount=order['qty'],
+                    price=order.get('limit_price'),
                     params=params
                 )
             else:
                 result = await self.exchange.create_order(
-                    symbol=order.symbol,
+                    symbol=order['symbol'],
                     type=order_type,
                     side=side,
-                    amount=order.quantity,
+                    amount=order['qty'],
                     params=params
                 )
 
             broker_order_id = result['id']
+            client_order_id = order.get('client_order_id') or f"kraken_{broker_order_id}"
+
+            # Create order response
+            order_resp: OrderResp = {
+                'client_order_id': client_order_id,
+                'broker_order_id': broker_order_id,
+                'status': 'ACCEPTED',
+                'reason': None,
+                'timestamp': datetime.now(timezone.utc).timestamp()
+            }
 
             # Update order tracking
-            order.broker_order_id = broker_order_id
-            order.status = 'SUBMITTED'
-            order.submitted_at = datetime.now(timezone.utc)
-            self._orders[broker_order_id] = order
+            self._orders[broker_order_id] = order_resp
 
-            logger.info(f"Order submitted: {broker_order_id} | {order.symbol} {side} {order.quantity} @ {order.price or 'MKT'}")
+            logger.info(f"Order submitted: {broker_order_id} | {order['symbol']} {side} {order['qty']} @ {order.get('limit_price') or 'MKT'}")
 
-            return broker_order_id
+            return order_resp
 
         except ccxt.NetworkError as e:
             logger.error(f"Network error submitting order: {e}")
@@ -176,15 +183,21 @@ class KrakenAdapter(BrokerAdapter):
         try:
             order = self._orders.get(broker_order_id)
             if not order:
-                logger.warning(f"Order {broker_order_id} not found in cache")
-                return False
+                # Try to cancel anyway - might be on exchange but not in cache
+                logger.warning(f"Order {broker_order_id} not found in cache, attempting cancel anyway")
+                try:
+                    await self.exchange.cancel_order(id=broker_order_id)
+                    return True
+                except:
+                    return False
 
-            result = await self.exchange.cancel_order(
-                id=broker_order_id,
-                symbol=order.symbol
-            )
+            # Get symbol from order if available, otherwise try to fetch from exchange
+            symbol = None  # We'll need to get this from somewhere
+            result = await self.exchange.cancel_order(id=broker_order_id)
 
-            order.status = 'CANCELED'
+            # Update order status in cache
+            if order:
+                order['status'] = 'CANCELED'
             logger.info(f"Order canceled: {broker_order_id}")
 
             return True
@@ -196,54 +209,10 @@ class KrakenAdapter(BrokerAdapter):
             logger.error(f"Error canceling order {broker_order_id}: {e}")
             return False
 
-    async def modify(self, broker_order_id: str, new_price: Optional[float] = None, new_quantity: Optional[int] = None) -> bool:
-        """
-        Modify order on Kraken.
+    # Note: modify() method removed - not part of BrokerAdapter protocol
+    # If order modification is needed, cancel and resubmit using the protocol methods
 
-        Note: Kraken doesn't support order modification directly.
-        This will cancel and re-submit as a new order.
-
-        Args:
-            broker_order_id: Kraken order ID
-            new_price: New limit price
-            new_quantity: New quantity
-
-        Returns:
-            success: True if modified successfully
-        """
-        await self._rate_limit()
-
-        try:
-            order = self._orders.get(broker_order_id)
-            if not order:
-                logger.warning(f"Order {broker_order_id} not found")
-                return False
-
-            # Cancel existing order
-            await self.cancel(broker_order_id)
-
-            # Create modified order
-            modified_order = Order(
-                symbol=order.symbol,
-                side=order.side,
-                quantity=new_quantity or order.quantity,
-                order_type=order.order_type,
-                price=new_price or order.price,
-                stop_price=order.stop_price,
-                time_in_force=order.time_in_force
-            )
-
-            # Submit new order
-            new_id = await self.submit(modified_order)
-            logger.info(f"Order modified: {broker_order_id} -> {new_id}")
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Error modifying order {broker_order_id}: {e}")
-            return False
-
-    async def get_orders(self) -> List[Order]:
+    async def get_open_orders(self) -> List[OrderResp]:
         """Get all open orders from Kraken."""
         await self._rate_limit()
 
@@ -254,7 +223,7 @@ class KrakenAdapter(BrokerAdapter):
             for order_data in open_orders:
                 order = self._parse_order(order_data)
                 orders.append(order)
-                self._orders[order.broker_order_id] = order
+                self._orders[order['broker_order_id']] = order
 
             return orders
 
@@ -356,18 +325,31 @@ class KrakenAdapter(BrokerAdapter):
 
         self._last_request_time = asyncio.get_event_loop().time()
 
-    def _parse_order(self, order_data: dict) -> Order:
-        """Parse ccxt order data into Order object."""
-        return Order(
-            symbol=order_data['symbol'],
-            side='BUY' if order_data['side'] == 'buy' else 'SELL',
-            quantity=int(order_data['amount']),
-            order_type='LIMIT' if order_data['type'] == 'limit' else 'MARKET',
-            price=order_data.get('price'),
-            broker_order_id=order_data['id'],
-            status=self._map_order_status(order_data['status']),
-            submitted_at=datetime.fromtimestamp(order_data['timestamp'] / 1000, tz=timezone.utc) if order_data.get('timestamp') else None
-        )
+    def _parse_order(self, order_data: dict) -> OrderResp:
+        """Parse ccxt order data into OrderResp object."""
+        timestamp = order_data.get('timestamp')
+        if timestamp:
+            timestamp_float = timestamp / 1000 if timestamp > 1e10 else timestamp
+        else:
+            timestamp_float = datetime.now(timezone.utc).timestamp()
+        
+        status_str = order_data.get('status', 'open')
+        # Map ccxt status to our OrderStatus
+        status_map = {
+            'open': 'ACCEPTED',
+            'closed': 'FILLED',
+            'canceled': 'CANCELED',
+            'expired': 'CANCELED'
+        }
+        mapped_status = status_map.get(status_str.lower(), 'ACCEPTED')
+        
+        return {
+            'client_order_id': order_data.get('clientOrderId') or f"kraken_{order_data['id']}",
+            'broker_order_id': str(order_data['id']),
+            'status': mapped_status,
+            'reason': None,
+            'timestamp': timestamp_float
+        }
 
     def _parse_position(self, pos_data: dict) -> Position:
         """Parse ccxt position data into Position object."""
