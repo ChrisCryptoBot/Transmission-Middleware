@@ -1,8 +1,8 @@
 /**
  * GearIndicator Component
  *
- * Visual representation of the Transmission gear state (P/R/N/D/L)
- * Animated, glass morphism design with smooth transitions
+ * Visual representation of the VEGUS gear state (P/R/N/D/L)
+ * Animated, glassmorphism design with smooth transitions
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,32 +27,32 @@ const GEAR_CONFIG: Record<GearType, {
 }> = {
   P: {
     label: 'PARK',
-    color: 'text-red-500',
-    glow: 'shadow-[0_0_30px_rgba(239,68,68,0.6)]',
+    color: 'text-red-400',
+    glow: 'shadow-[0_0_30px_rgba(248,113,113,0.6)]',
     description: 'Trading locked'
   },
   R: {
     label: 'REVERSE',
-    color: 'text-yellow-500',
-    glow: 'shadow-[0_0_30px_rgba(234,179,8,0.6)]',
+    color: 'text-amber-400',
+    glow: 'shadow-[0_0_30px_rgba(251,191,36,0.6)]',
     description: 'Recovery mode'
   },
   N: {
     label: 'NEUTRAL',
-    color: 'text-gray-400',
-    glow: 'shadow-[0_0_30px_rgba(156,163,175,0.4)]',
+    color: 'text-neutral-400',
+    glow: 'shadow-[0_0_30px_rgba(163,163,163,0.4)]',
     description: 'Standby'
   },
   D: {
     label: 'DRIVE',
-    color: 'text-green-500',
-    glow: 'shadow-[0_0_30px_rgba(34,197,94,0.6)]',
+    color: 'text-green-400',
+    glow: 'shadow-[0_0_30px_rgba(74,222,128,0.6)]',
     description: 'Normal trading'
   },
   L: {
     label: 'LOW',
-    color: 'text-blue-500',
-    glow: 'shadow-[0_0_30px_rgba(59,130,246,0.6)]',
+    color: 'text-blue-400',
+    glow: 'shadow-[0_0_30px_rgba(96,165,250,0.6)]',
     description: 'Risk downshifted'
   }
 };
@@ -104,11 +104,11 @@ export function GearIndicator({
           <div className="absolute inset-0 opacity-20">
             <motion.div
               className={`absolute inset-0 bg-gradient-to-br ${
-                currentGear === 'P' ? 'from-red-500 to-red-700' :
-                currentGear === 'R' ? 'from-yellow-500 to-yellow-700' :
-                currentGear === 'N' ? 'from-gray-400 to-gray-600' :
-                currentGear === 'D' ? 'from-green-500 to-green-700' :
-                'from-blue-500 to-blue-700'
+                currentGear === 'P' ? 'from-red-400 to-red-600' :
+                currentGear === 'R' ? 'from-amber-400 to-amber-600' :
+                currentGear === 'N' ? 'from-neutral-400 to-neutral-600' :
+                currentGear === 'D' ? 'from-green-400 to-green-600' :
+                'from-blue-400 to-blue-600'
               }`}
               animate={{
                 opacity: isShifting ? [0.2, 0.4, 0.2] : 0.2,
@@ -149,7 +149,7 @@ export function GearIndicator({
             </motion.div>
 
             {/* Description */}
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-neutral-400">
               {config.description}
             </div>
 
@@ -160,7 +160,7 @@ export function GearIndicator({
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
             >
-              <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+              <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">
                 Position Size
               </div>
               <div className={`text-2xl font-bold ${config.color}`}>
@@ -192,10 +192,10 @@ export function GearIndicator({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+          <div className="text-xs text-neutral-500 uppercase tracking-wider mb-2">
             Current Status
           </div>
-          <div className="text-sm text-gray-300 leading-relaxed">
+          <div className="text-sm text-neutral-300 leading-relaxed">
             {reason}
           </div>
         </motion.div>
@@ -231,7 +231,7 @@ export function GearIndicatorCompact({ currentGear, className = '' }: { currentG
       <div className={`text-2xl font-black ${config.color}`}>
         {currentGear}
       </div>
-      <div className="text-xs text-gray-400 uppercase tracking-wider">
+      <div className="text-xs text-neutral-400 uppercase tracking-wider">
         {config.label}
       </div>
     </motion.div>

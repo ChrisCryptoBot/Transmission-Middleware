@@ -127,8 +127,8 @@ export function ManualSignalForm() {
         <h2 className="text-gradient text-3xl font-bold mb-2">
           Manual Signal Submission
         </h2>
-        <p className="text-muted-foreground text-sm">
-          Submit signals manually for dogfooding and testing
+        <p className="text-neutral-400 text-sm">
+          Submit trading signals directly to VEGUS for testing and validation
         </p>
       </div>
 
@@ -150,7 +150,7 @@ export function ManualSignalForm() {
             required
             className="transition-smooth focus:scale-[1.01]"
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-neutral-400">
             Check server logs for default API key or create one via /api/auth
           </p>
         </div>
@@ -263,24 +263,24 @@ export function ManualSignalForm() {
 
           {/* Risk Metrics Display - Animated */}
           {metrics && (
-            <div className="mt-6 p-4 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-purple-200/50 dark:border-purple-800/50">
+            <div className="mt-6 p-4 rounded-lg glass border border-indigo-500/30">
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
-                  <div className="text-xs text-muted-foreground mb-1">Stop Distance</div>
+                  <div className="text-xs text-neutral-400 mb-1">Stop Distance</div>
                   <div className="text-2xl font-bold text-gradient">{metrics.stopDistance}</div>
-                  <div className="text-xs text-muted-foreground">pts</div>
+                  <div className="text-xs text-neutral-400">pts</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xs text-muted-foreground mb-1">Target Distance</div>
+                  <div className="text-xs text-neutral-400 mb-1">Target Distance</div>
                   <div className="text-2xl font-bold text-gradient">{metrics.targetDistance}</div>
-                  <div className="text-xs text-muted-foreground">pts</div>
+                  <div className="text-xs text-neutral-400">pts</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-xs text-muted-foreground mb-1">Risk:Reward</div>
-                  <div className={`text-2xl font-bold ${parseFloat(metrics.riskReward) >= 2 ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                  <div className="text-xs text-neutral-400 mb-1">Risk:Reward</div>
+                  <div className={`text-2xl font-bold ${parseFloat(metrics.riskReward) >= 2 ? 'text-green-400' : 'text-amber-400'}`}>
                     1:{metrics.riskReward}
                   </div>
-                  <div className="text-xs text-muted-foreground">ratio</div>
+                  <div className="text-xs text-neutral-400">ratio</div>
                 </div>
               </div>
             </div>
@@ -300,8 +300,8 @@ export function ManualSignalForm() {
               placeholder="1"
               className="transition-smooth"
             />
-            <p className="text-xs text-muted-foreground">
-              Leave blank for Transmission to calculate
+            <p className="text-xs text-neutral-400">
+              Leave blank for VEGUS to calculate based on risk parameters
             </p>
           </div>
 
@@ -342,7 +342,7 @@ export function ManualSignalForm() {
             onChange={(e) => handleChange('notes', e.target.value)}
             className="glass flex min-h-[100px] w-full rounded-xl px-4 py-3 text-sm transition-smooth
               focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:scale-[1.01]
-              placeholder:text-muted-foreground"
+              placeholder:text-neutral-400"
             placeholder="Trade setup notes, market conditions, confluence factors..."
           />
         </div>
@@ -368,7 +368,7 @@ export function ManualSignalForm() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Submit Signal to Transmission
+              Submit Signal to VEGUS
             </span>
           )}
         </Button>
