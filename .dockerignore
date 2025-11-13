@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (exclude from image)
+docs/
+BLUEPRINTS/
+*.md
+
+# Data (don't copy into image)
+data/
+*.db
+*.sqlite
+
+# OS
+.DS_Store
+Thumbs.db
