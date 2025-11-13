@@ -38,6 +38,7 @@ class Signal:
     to the execution engine.
     """
     symbol: str  # Trading symbol (e.g., "MNQ", "ES")
+    asset_class: str  # Asset class: "futures", "equity", "crypto", "forex"
     entry_price: float
     stop_price: float
     target_price: float

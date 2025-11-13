@@ -36,6 +36,7 @@ from transmission.risk.news_flat import NewsFlat
 from transmission.analytics.journal_analytics import JournalAnalytics
 from transmission.database import Database
 from transmission.config.config_loader import ConfigLoader
+from transmission.config.instrument_specs import InstrumentSpecService
 from datetime import datetime
 
 
@@ -104,29 +105,33 @@ class TransmissionOrchestrator:
         
         # Log effective values
         ConfigLoader.log_effective_values(constraints_config)
-        
-        # Core modules
-        self.telemetry = Telemetry(tick_size=0.25)
+
+        # Instrument specifications (for multi-asset support)
+        self.instrument_spec = InstrumentSpecService()
+
+        # Core modules (default to MNQ specs for telemetry/trade manager)
+        default_tick_size = self.instrument_spec.get_tick_size("MNQ")
+        self.telemetry = Telemetry(tick_size=default_tick_size)
         self.regime_classifier = RegimeClassifier()
-        
+
         # Risk management
         if risk_governor is None:
             risk_governor = RiskGovernor(db_path=db_path)
         self.risk_governor = risk_governor
-        
+
         if constraint_engine is None:
             constraint_engine = SmartConstraintEngine()
         self.constraint_engine = constraint_engine
-        
+
         # Execution
         guard_mode = config.get('execution', {}).get('guard_mode', 'strict')
         self.execution_guard = ExecutionGuard()
-        
-        # Position Sizing
-        self.position_sizer = PositionSizer()
-        
+
+        # Position Sizing (with multi-asset support)
+        self.position_sizer = PositionSizer(instrument_spec_service=self.instrument_spec)
+
         # New modules
-        self.in_trade_manager = InTradeManager(tick_size=0.25)
+        self.in_trade_manager = InTradeManager(tick_size=default_tick_size)
         self.multi_tf_fusion = MultiTimeframeFusion(
             ltf_interval="1m",
             htf_intervals=["15m", "1h"],
@@ -455,7 +460,8 @@ class TransmissionOrchestrator:
             # Step 5: Constraint Validation (Simplified)
             # Get current bid/ask from broker
             bid, ask = self.broker.get_bid_ask(signal.symbol)
-            spread_ticks = (ask - bid) / 0.25  # Assuming tick size = 0.25
+            tick_size = self.instrument_spec.get_tick_size(signal.symbol)
+            spread_ticks = (ask - bid) / tick_size
 
             # DLL constraint
             dll_constraint = self.constraint_engine.get_dll_constraint()
