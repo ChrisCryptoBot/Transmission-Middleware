@@ -155,15 +155,19 @@ class ExecutionEngine:
     def place_signal(
         self,
         signal: Signal,
-        qty: float
+        qty: float,
+        gear_at_entry: Optional[str] = None,
+        gear_shift_reason: Optional[str] = None
     ) -> Optional[str]:
         """
         Place a signal as an order.
-        
+
         Args:
             signal: Trading signal
             qty: Quantity (contracts)
-            
+            gear_at_entry: Current gear state (P/R/N/D/L)
+            gear_shift_reason: Reason for current gear
+
         Returns:
             broker_order_id if successful, None if rejected
         """
@@ -214,7 +218,7 @@ class ExecutionEngine:
         self.active_orders[broker_order_id] = order_resp
         self.order_states[broker_order_id] = OrderState.SUBMITTED
         
-        # Log trade entry to database
+        # Log trade entry to database (with gear state)
         trade_id = self.database.log_trade(
             symbol=signal.symbol,
             trade_type=signal.direction,
@@ -227,7 +231,9 @@ class ExecutionEngine:
             vwap_at_entry=None,  # TODO: Get from signal/features
             adx_at_entry=None,  # TODO: Get from signal/features
             strategy_confidence_score=signal.confidence,
-            trade_trigger_signal=signal.notes
+            trade_trigger_signal=signal.notes,
+            gear_at_entry=gear_at_entry,
+            gear_shift_reason_entry=gear_shift_reason
         )
         
         self.trade_ids[broker_order_id] = trade_id
