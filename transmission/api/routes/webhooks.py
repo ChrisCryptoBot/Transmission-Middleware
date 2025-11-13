@@ -72,20 +72,21 @@ async def tradingview_webhook(
         
         signal = adapter.parse(alert)
         
-        # Process signal through Transmission
-        # Note: This is a simplified version - full integration would use process_bar()
-        # For webhooks, we process the signal directly
         logger.info(
             f"TradingView webhook: {signal.direction} {signal.symbol} @ {signal.entry_price}"
         )
         
-        # TODO: Integrate with orchestrator.process_signal() when available
-        # For now, return acknowledgment
+        # Process signal through full Transmission pipeline
+        result = orchestrator.process_signal(
+            signal=signal,
+            current_price=signal.entry_price,
+            bid=None,  # TradingView alerts don't include bid/ask
+            ask=None,
+            bars_15m=None  # No historical bars from webhook
+        )
+        
         return {
-            "status": "processed",
-            "signal_id": f"tv_{signal.timestamp.timestamp()}",
-            "action": "TRADE",  # Would be determined by orchestrator
-            "reason": "Signal received and queued for processing",
+            **result,
             "symbol": signal.symbol,
             "direction": signal.direction,
             "entry_price": signal.entry_price
@@ -153,12 +154,17 @@ async def mt5_webhook(
             f"MT5 webhook: {transmission_signal.direction} {transmission_signal.symbol} @ {transmission_signal.entry_price}"
         )
         
-        # TODO: Integrate with orchestrator.process_signal() when available
+        # Process signal through full Transmission pipeline
+        result = orchestrator.process_signal(
+            signal=transmission_signal,
+            current_price=transmission_signal.entry_price,
+            bid=None,  # MT5 signals may not include bid/ask
+            ask=None,
+            bars_15m=None
+        )
+        
         return {
-            "status": "processed",
-            "signal_id": f"mt5_{transmission_signal.timestamp.timestamp()}",
-            "action": "TRADE",
-            "reason": "Signal received and queued for processing",
+            **result,
             "symbol": transmission_signal.symbol,
             "direction": transmission_signal.direction,
             "entry_price": transmission_signal.entry_price
@@ -236,12 +242,17 @@ async def generic_webhook(
             f"{transmission_signal.symbol} @ {transmission_signal.entry_price}"
         )
         
-        # TODO: Integrate with orchestrator.process_signal() when available
+        # Process signal through full Transmission pipeline
+        result = orchestrator.process_signal(
+            signal=transmission_signal,
+            current_price=transmission_signal.entry_price,
+            bid=None,
+            ask=None,
+            bars_15m=None
+        )
+        
         return {
-            "status": "processed",
-            "signal_id": f"webhook_{transmission_signal.timestamp.timestamp()}",
-            "action": "TRADE",
-            "reason": "Signal received and queued for processing",
+            **result,
             "symbol": transmission_signal.symbol,
             "direction": transmission_signal.direction,
             "entry_price": transmission_signal.entry_price
