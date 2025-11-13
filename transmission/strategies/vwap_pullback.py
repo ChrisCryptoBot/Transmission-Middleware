@@ -137,6 +137,7 @@ class VWAPPullbackStrategy(BaseStrategy):
         confidence = self.calculate_confidence(features, setup_quality)
         
         return Signal(
+            symbol="MNQ",  # Default symbol - will be overridden by orchestrator if needed
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
@@ -189,6 +190,7 @@ class VWAPPullbackStrategy(BaseStrategy):
         confidence = self.calculate_confidence(features, setup_quality)
         
         return Signal(
+            symbol="MNQ",  # Default symbol - will be overridden by orchestrator if needed
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,

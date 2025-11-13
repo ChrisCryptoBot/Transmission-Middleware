@@ -37,6 +37,7 @@ class Signal:
     This is the output of strategy.generate_signal() and the input
     to the execution engine.
     """
+    symbol: str  # Trading symbol (e.g., "MNQ")
     entry_price: float
     stop_price: float
     target_price: float
