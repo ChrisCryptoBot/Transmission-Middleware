@@ -17,37 +17,34 @@ from transmission.config.instrument_specs import InstrumentSpecService
 class VWAPPullbackStrategy(BaseStrategy):
     """
     VWAP Pullback Strategy for trending markets.
-    
+
     Entry Logic:
     - Market must be in TREND regime
     - Price pulls back to VWAP (within adaptive distance)
     - Entry on bounce from VWAP
-    
+
     Exit Logic:
     - Stop: Below recent swing low (for longs) or above swing high (for shorts)
     - Target: 2:1 or 3:1 risk:reward ratio
     """
-    
+
     def __init__(
         self,
         risk_reward_ratio: float = 2.0,
         vwap_distance_threshold: float = 0.5,  # % distance from VWAP
-        min_adx: float = 25.0,
-        symbol: str = "MNQ"  # Default symbol
+        min_adx: float = 25.0
     ):
         """
         Initialize VWAP Pullback Strategy.
-        
+
         Args:
             risk_reward_ratio: Target risk:reward (default 2:1)
             vwap_distance_threshold: Maximum % distance from VWAP for entry (default 0.5%)
             min_adx: Minimum ADX for trend confirmation (default 25)
-            symbol: Trading symbol (default "MNQ")
         """
         self.risk_reward_ratio = risk_reward_ratio
         self.vwap_distance_threshold = vwap_distance_threshold
         self.min_adx = min_adx
-        self.symbol = symbol
         self.instrument_spec = InstrumentSpecService()
     
     @property
@@ -143,9 +140,9 @@ class VWAPPullbackStrategy(BaseStrategy):
         
         confidence = self.calculate_confidence(features, setup_quality)
 
-        # Get asset class from instrument spec
+        # Get asset class for symbol
         asset_class = self.instrument_spec.get_asset_class(symbol)
-        
+
         return Signal(
             symbol=symbol,
             asset_class=asset_class,
@@ -200,9 +197,9 @@ class VWAPPullbackStrategy(BaseStrategy):
         
         confidence = self.calculate_confidence(features, setup_quality)
 
-        # Get asset class from instrument spec
+        # Get asset class for symbol
         asset_class = self.instrument_spec.get_asset_class(symbol)
-        
+
         return Signal(
             symbol=symbol,
             asset_class=asset_class,

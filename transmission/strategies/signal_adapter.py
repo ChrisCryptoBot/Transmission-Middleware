@@ -86,6 +86,32 @@ class SignalAdapter(ABC):
 
         return normalized or symbol
 
+    def infer_asset_class(self, symbol: str) -> str:
+        """
+        Infer asset class from symbol.
+
+        Tries to use InstrumentSpecService first, falls back to heuristics.
+
+        Args:
+            symbol: Normalized symbol (e.g., "MNQ", "ES")
+
+        Returns:
+            Asset class: "futures", "equity", "crypto", "forex", or "unknown"
+        """
+        try:
+            from transmission.config.instrument_specs import InstrumentSpecService
+            spec_service = InstrumentSpecService()
+            return spec_service.get_asset_class(symbol)
+        except Exception:
+            # Fallback: heuristic-based inference
+            if symbol in ['MNQ', 'MES', 'ES', 'NQ', 'YM', 'RTY', 'CL', 'GC', 'SI']:
+                return 'futures'
+            if 'BTC' in symbol or 'ETH' in symbol or 'USDT' in symbol:
+                return 'crypto'
+            if len(symbol) == 6 and any(curr in symbol for curr in ['USD', 'EUR', 'GBP', 'JPY']):
+                return 'forex'
+            return 'unknown'
+
 
 class TradingViewAdapter(SignalAdapter):
     """
@@ -135,6 +161,9 @@ class TradingViewAdapter(SignalAdapter):
 
         # Parse symbol
         symbol = self.normalize_symbol(raw_signal["ticker"])
+
+        # Infer asset class
+        asset_class = self.infer_asset_class(symbol)
 
         # Parse price
         entry_price = float(raw_signal["close"])
@@ -225,6 +254,9 @@ class MT5Adapter(SignalAdapter):
 
         # Parse symbol
         symbol = self.normalize_symbol(raw_signal["symbol"])
+
+        # Infer asset class
+        asset_class = self.infer_asset_class(symbol)
 
         # Parse price
         entry_price = float(raw_signal["price"])
@@ -318,6 +350,9 @@ class GenericWebhookAdapter(SignalAdapter):
 
         # Parse symbol
         symbol = self.normalize_symbol(raw_signal["symbol"])
+
+        # Infer or use provided asset class
+        asset_class = raw_signal.get("asset_class", self.infer_asset_class(symbol))
 
         # Parse price
         entry_price = float(raw_signal["entry"])

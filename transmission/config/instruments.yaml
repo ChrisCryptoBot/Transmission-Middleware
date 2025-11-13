@@ -16,7 +16,7 @@ instruments:
     session_start: "08:30 CT"  # Regular trading session
     session_end: "15:00 CT"
     timezone: "America/Chicago"
-    
+
   MES:
     name: "Micro E-mini S&P 500"
     symbol: "MES"
@@ -31,7 +31,7 @@ instruments:
     session_start: "08:30 CT"
     session_end: "15:00 CT"
     timezone: "America/Chicago"
-  
+
   ES:
     name: "E-mini S&P 500"
     symbol: "ES"
@@ -46,7 +46,7 @@ instruments:
     session_start: "08:30 CT"
     session_end: "15:00 CT"
     timezone: "America/Chicago"
-  
+
   NQ:
     name: "E-mini Nasdaq-100"
     symbol: "NQ"

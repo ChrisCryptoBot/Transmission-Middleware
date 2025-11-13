@@ -73,8 +73,7 @@ class TransmissionOrchestrator:
         db_path: Optional[str] = None,
         database: Optional[Database] = None,
         broker: Optional[BrokerAdapter] = None,
-        config: Optional[Dict] = None,
-        instrument_spec_service: Optional[InstrumentSpecService] = None
+        config: Optional[Dict] = None
     ):
         """
         Initialize Transmission Orchestrator.
@@ -106,36 +105,33 @@ class TransmissionOrchestrator:
         
         # Log effective values
         ConfigLoader.log_effective_values(constraints_config)
-        
-        # Instrument specifications (multi-asset support)
-        self.instrument_spec = instrument_spec_service or InstrumentSpecService()
-        
-        # Core modules
-        # Note: Telemetry tick_size will be looked up per symbol when needed
-        self.telemetry = Telemetry(tick_size=0.25)  # Default, will use instrument_spec per symbol
+
+        # Instrument specifications (for multi-asset support)
+        self.instrument_spec = InstrumentSpecService()
+
+        # Core modules (default to MNQ specs for telemetry/trade manager)
+        default_tick_size = self.instrument_spec.get_tick_size("MNQ")
+        self.telemetry = Telemetry(tick_size=default_tick_size)
         self.regime_classifier = RegimeClassifier()
-        
+
         # Risk management
         if risk_governor is None:
             risk_governor = RiskGovernor(db_path=db_path)
         self.risk_governor = risk_governor
-        
+
         if constraint_engine is None:
             constraint_engine = SmartConstraintEngine()
         self.constraint_engine = constraint_engine
-        
+
         # Execution
         guard_mode = config.get('execution', {}).get('guard_mode', 'strict')
         self.execution_guard = ExecutionGuard()
-        
-        # Position Sizing (with instrument spec service)
-        self.position_sizer = PositionSizer(
-            instrument_spec_service=self.instrument_spec
-        )
-        
+
+        # Position Sizing (with multi-asset support)
+        self.position_sizer = PositionSizer(instrument_spec_service=self.instrument_spec)
+
         # New modules
-        # Note: InTradeManager tick_size will be looked up per symbol when needed
-        self.in_trade_manager = InTradeManager(tick_size=0.25)  # Default, will use instrument_spec per symbol
+        self.in_trade_manager = InTradeManager(tick_size=default_tick_size)
         self.multi_tf_fusion = MultiTimeframeFusion(
             ltf_interval="1m",
             htf_intervals=["15m", "1h"],
@@ -255,14 +251,10 @@ class TransmissionOrchestrator:
             self.current_strategy = strategy
             
             # Step 9: Generate signal
-            # TODO: Get symbol from config or signal context - for now default to MNQ
-            # In production, this should come from market data source or config
-            symbol = "MNQ"  # Default - will be made configurable
             signal = strategy.generate_signal(
                 features=features,
                 regime=regime_result.regime,
-                current_positions=self.current_positions,
-                symbol=symbol  # ADD THIS
+                current_positions=self.current_positions
             )
             
             if signal is None:
@@ -283,7 +275,6 @@ class TransmissionOrchestrator:
             
             # Calculate contracts with ATR normalization
             contracts = self.position_sizer.calculate_contracts(
-                symbol=signal.symbol,  # ADD THIS
                 risk_dollars=risk_dollars,
                 stop_points=stop_distance_points,
                 atr_current=features.atr_14,
@@ -438,34 +429,19 @@ class TransmissionOrchestrator:
             # Apply mental state multiplier
             risk_dollars *= mental_result.size_multiplier
 
-            # Calculate contracts using position sizer (with ATR normalization if features available)
-            if bars_15m is not None and len(bars_15m) > 0:
-                # Full ATR normalization if we have bars
-                contracts = self.position_sizer.calculate_contracts(
-                    symbol=signal.symbol,
-                    risk_dollars=risk_dollars,
-                    stop_points=stop_distance_points,
-                    atr_current=features.atr_14,
-                    atr_baseline=features.baseline_atr,
-                    dll_constraint=self.constraint_engine.get_dll_constraint(),
-                    mental_state=mental_result.current_state.value
-                )
+            # Calculate contracts (simplified - no ATR normalization for webhook signals)
+            if stop_distance_points > 0:
+                contracts = int(risk_dollars / stop_distance_points)
             else:
-                # Simplified sizing for webhook signals (no ATR data)
-                point_value = self.instrument_spec.get_point_value(signal.symbol)
-                if stop_distance_points > 0:
-                    risk_per_contract = stop_distance_points * point_value
-                    contracts = int(risk_dollars / risk_per_contract) if risk_per_contract > 0 else 0
-                else:
-                    logger.warning("Signal has zero stop distance - rejecting")
-                    return {
-                        "status": "rejected",
-                        "action": "REJECT",
-                        "reason": "Invalid stop distance (zero)",
-                        "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
-                        "symbol": signal.symbol,
-                        "direction": signal.direction
-                    }
+                logger.warning("Signal has zero stop distance - rejecting")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": "Invalid stop distance (zero)",
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction
+                }
 
             if contracts < 1:
                 logger.info(f"Position too small after sizing: {contracts}")
@@ -597,255 +573,6 @@ class TransmissionOrchestrator:
             Strategy instance or None if no strategy for regime
         """
         return self.strategies.get(regime)
-    
-    def process_signal(
-        self,
-        signal: Signal,
-        current_price: Optional[float] = None,
-        bid: Optional[float] = None,
-        ask: Optional[float] = None,
-        bars_15m: Optional[pd.DataFrame] = None
-    ) -> Dict[str, Any]:
-        """
-        Process an external signal (from webhook or API).
-        
-        Runs the signal through the full Transmission pipeline:
-        - Mental state check
-        - News blackout check
-        - Risk tripwires
-        - Constraint validation
-        - Position sizing
-        - Execution guard
-        - Trade execution
-        
-        Args:
-            signal: External signal to process
-            current_price: Current market price (uses signal.entry_price if None)
-            bid: Current bid price (optional)
-            ask: Current ask price (optional)
-            bars_15m: Recent 15-minute bars for feature calculation (optional)
-        
-        Returns:
-            Dict with:
-            - status: "processed" | "rejected" | "error"
-            - action: "TRADE" | "SKIP" | "REJECT"
-            - reason: Explanation
-            - signal_id: Signal identifier
-            - order_id: Order ID if executed (None otherwise)
-        """
-        try:
-            self.state = SystemState.ANALYZING
-            
-            # Use signal entry price if current_price not provided
-            if current_price is None:
-                current_price = signal.entry_price
-            
-            # Step 1: Check mental state
-            mental_result = self.mental_governor.evaluate()
-            if mental_result.current_state == MentalState.BLOCKED:
-                logger.warning(f"Trading blocked by mental governor: {mental_result.reason}")
-                self._broadcast_rejection("mental_block", mental_result.reason)
-                return {
-                    "status": "rejected",
-                    "action": "REJECT",
-                    "reason": f"Mental state: {mental_result.reason}",
-                    "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                    "order_id": None
-                }
-            
-            # Step 2: Check news blackout
-            if self.news_flat.in_blackout(signal.symbol):
-                logger.warning(f"Trading blocked: News blackout for {signal.symbol}")
-                self._broadcast_rejection("news_blackout", f"News blackout active for {signal.symbol}")
-                return {
-                    "status": "rejected",
-                    "action": "REJECT",
-                    "reason": "News blackout active",
-                    "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                    "order_id": None
-                }
-            
-            # Step 3: Check risk tripwires
-            tripwire = self.risk_governor.check_tripwires()
-            if not tripwire.can_trade:
-                logger.warning(f"Trading blocked: {tripwire.reason}")
-                self._broadcast_rejection("tripwire", tripwire.reason)
-                return {
-                    "status": "rejected",
-                    "action": "REJECT",
-                    "reason": tripwire.reason,
-                    "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                    "order_id": None
-                }
-            
-            # Step 4: Calculate market features (if bars provided)
-            features = None
-            if bars_15m is not None and len(bars_15m) > 0:
-                features = self.telemetry.calculate_all_features(
-                    bars_15m=bars_15m,
-                    current_price=current_price,
-                    bid=bid,
-                    ask=ask
-                )
-            else:
-                # Create minimal features for webhook signals
-                features = MarketFeatures(
-                    adx_14=25.0,  # Default moderate trend
-                    vwap=current_price,
-                    atr_14=10.0,  # Default ATR
-                    baseline_atr=10.0,
-                    spread_ticks=1.0 if bid and ask else 1.0,
-                    entry_p90_slippage=1.0,
-                    news_proximity_min=999.0,  # No news nearby
-                    opening_range_high=current_price * 1.01,
-                    opening_range_low=current_price * 0.99
-                )
-            
-            # Step 5: Calculate position size (ATR-normalized)
-            risk_dollars = self.risk_governor.get_current_r()
-            risk_dollars *= mental_result.size_multiplier  # Apply mental state multiplier
-            
-            # Calculate stop distance (use signal stop_price if provided, else estimate)
-            if signal.stop_price:
-                stop_distance_points = abs(signal.entry_price - signal.stop_price)
-            else:
-                # Estimate stop based on ATR
-                stop_distance_points = features.atr_14 * 1.5
-            
-            # Get DLL constraint
-            dll_constraint = self.constraint_engine.get_dll_constraint()
-            
-            # Calculate contracts
-            contracts = self.position_sizer.calculate_contracts(
-                symbol=signal.symbol,  # ADD THIS
-                risk_dollars=risk_dollars,
-                stop_points=stop_distance_points,
-                atr_current=features.atr_14,
-                atr_baseline=features.baseline_atr,
-                dll_constraint=dll_constraint,
-                mental_state=mental_result.current_state.value
-            )
-            
-            if contracts < 1:
-                logger.info("Position too small after sizing - skipping trade")
-                self._broadcast_rejection("position_too_small", "Position size < 1 contract")
-                return {
-                    "status": "rejected",
-                    "action": "SKIP",
-                    "reason": "Position size < 1 contract after sizing",
-                    "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                    "order_id": None
-                }
-            
-            signal.contracts = contracts
-            
-            # Step 6: Validate constraints
-            spread_ticks = features.spread_ticks if hasattr(features, 'spread_ticks') else 1.0
-            if bid is not None and ask is not None:
-                spread_ticks = self.telemetry.calculate_spread_ticks(bid, ask)
-            
-            constraint_result = self.constraint_engine.validate_trade(
-                symbol=signal.symbol,
-                risk_dollars=risk_dollars,
-                spread_ticks=spread_ticks,
-                estimated_slippage_ticks=features.entry_p90_slippage if hasattr(features, 'entry_p90_slippage') else 1.0,
-                news_proximity_min=features.news_proximity_min,
-                mental_state=mental_result.current_state.value,
-                account_equity=None,  # TODO: Get from account
-                dll_remaining=dll_constraint
-            )
-            
-            if not constraint_result.approved:
-                logger.warning(f"Trade blocked by constraints: {constraint_result.reason}")
-                self.database.save_system_state(
-                    system_state="constraint_violation",
-                    current_regime=self.current_regime or "UNKNOWN",
-                    active_strategy=signal.strategy
-                )
-                self._broadcast_rejection("constraint_violation", constraint_result.reason)
-                return {
-                    "status": "rejected",
-                    "action": "REJECT",
-                    "reason": constraint_result.reason,
-                    "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                    "order_id": None
-                }
-            
-            # Step 7: Check execution quality (Guard)
-            if bid is not None and ask is not None:
-                execution_check = self.execution_guard.validate_execution(
-                    spread_ticks=spread_ticks,
-                    order_size=signal.contracts
-                )
-                
-                if not execution_check.approved:
-                    logger.warning(f"Execution blocked by guard: {execution_check.reason}")
-                    self.database.save_system_state(
-                        system_state="guard_reject",
-                        current_regime=self.current_regime or "UNKNOWN",
-                        active_strategy=signal.strategy
-                    )
-                    self._broadcast_rejection("guard_reject", execution_check.reason)
-                    return {
-                        "status": "rejected",
-                        "action": "REJECT",
-                        "reason": execution_check.reason,
-                        "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                        "order_id": None
-                    }
-                
-                signal.notes = f"{signal.notes or ''} | Order type: {execution_check.recommended_order_type}"
-            
-            # Step 8: Execute trade
-            order_id = self.execution_engine.place_signal(
-                signal=signal,
-                qty=float(signal.contracts)
-            )
-            
-            if order_id is None:
-                logger.error("Order submission failed")
-                return {
-                    "status": "error",
-                    "action": "REJECT",
-                    "reason": "Order submission failed",
-                    "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                    "order_id": None
-                }
-            
-            # Step 9: Journal + Broadcast
-            self.database.save_system_state(
-                system_state="order_submitted",
-                current_regime=self.current_regime or "UNKNOWN",
-                active_strategy=signal.strategy
-            )
-            self._broadcast_order_submitted(order_id, signal)
-            
-            logger.info(
-                f"External signal executed: {signal.strategy} {signal.direction} "
-                f"{signal.contracts} contracts @ {signal.entry_price:.2f} "
-                f"(order_id: {order_id})"
-            )
-            
-            return {
-                "status": "processed",
-                "action": "TRADE",
-                "reason": "Signal processed and order submitted",
-                "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                "order_id": order_id,
-                "contracts": signal.contracts,
-                "entry_price": signal.entry_price
-            }
-            
-        except Exception as e:
-            logger.error(f"Error processing external signal: {e}", exc_info=True)
-            self.state = SystemState.ERROR
-            return {
-                "status": "error",
-                "action": "REJECT",
-                "reason": f"Error processing signal: {str(e)}",
-                "signal_id": f"sig_{signal.timestamp.timestamp() if signal.timestamp else datetime.now().timestamp()}",
-                "order_id": None
-            }
     
     def record_trade_result(
         self,
