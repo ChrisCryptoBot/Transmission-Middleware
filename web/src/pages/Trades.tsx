@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TradeResponse } from '@/lib/types';
 import { formatNumber, formatR, formatDateTime } from '@/lib/utils';
+import { PerformanceCharts } from '@/components/PerformanceCharts';
 
 export default function Trades() {
   const { data, isLoading } = useQuery({
@@ -30,7 +31,11 @@ export default function Trades() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6">
+      {/* Performance Charts Section */}
+      <PerformanceCharts />
+
+      {/* Trade History Table */}
       <Card>
         <CardHeader>
           <CardTitle>Trade History ({data?.total || 0} total)</CardTitle>

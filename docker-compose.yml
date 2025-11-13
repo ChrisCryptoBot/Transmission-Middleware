@@ -1,0 +1,59 @@
+# Transmission Middleware - Docker Compose
+# Orchestrates API + Web + Database services
+
+version: '3.8'
+
+services:
+  # Python FastAPI Backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: transmission-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=sqlite:////app/data/transmission.db
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data:/app/data  # Persist database
+      - ./config:/app/config  # Config files
+      - ./transmission:/app/transmission  # Live code (dev only)
+    restart: unless-stopped
+    networks:
+      - transmission-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # React Frontend
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: transmission-web
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - transmission-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  transmission-network:
+    driver: bridge
+
+volumes:
+  transmission-data:
+    driver: local
