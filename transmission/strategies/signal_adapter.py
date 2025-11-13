@@ -163,6 +163,7 @@ class TradingViewAdapter(SignalAdapter):
         contracts = raw_signal.get("contracts", 1)
 
         return Signal(
+            symbol=symbol,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
@@ -250,6 +251,7 @@ class MT5Adapter(SignalAdapter):
         confidence = 0.75
 
         return Signal(
+            symbol=symbol,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
@@ -330,6 +332,7 @@ class GenericWebhookAdapter(SignalAdapter):
         notes = raw_signal.get("notes", "Generic webhook signal")
 
         return Signal(
+            symbol=symbol,
             entry_price=entry_price,
             stop_price=stop_price,
             target_price=target_price,
