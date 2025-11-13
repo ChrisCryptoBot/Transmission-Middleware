@@ -17,7 +17,10 @@ export function useWebSocket(path = '/ws') {
     // Use Vite proxy for WebSocket (relative path)
     // Vite will proxy /ws to ws://localhost:8000/ws
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}${path}`;
+    const host = window.location.host || 'localhost:5173';
+    const wsUrl = `${protocol}//${host}${path}`;
+    
+    console.log('Connecting to WebSocket:', wsUrl);
     
     try {
       const ws = new WebSocket(wsUrl);
@@ -43,17 +46,19 @@ export function useWebSocket(path = '/ws') {
         setIsConnected(false);
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setIsConnected(false);
-        console.log('WebSocket disconnected');
+        console.log('WebSocket disconnected', event.code, event.reason);
         
-        // Reconnect with exponential backoff
-        if (reconnectAttempts < 5) {
+        // Only reconnect if not a normal closure and attempts remain
+        if (event.code !== 1000 && reconnectAttempts < 5) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
           reconnectTimeoutRef.current = setTimeout(() => {
             setReconnectAttempts((prev) => prev + 1);
             connect();
           }, delay);
+        } else if (reconnectAttempts >= 5) {
+          console.warn('WebSocket: Max reconnect attempts reached. Backend may not be running.');
         }
       };
     } catch (error) {
