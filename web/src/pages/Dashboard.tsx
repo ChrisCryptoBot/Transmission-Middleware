@@ -1,3 +1,8 @@
+/**
+ * VEGUS Dashboard - Main Trading Interface
+ * Professional Adaptive Trading Platform with Gear State Visualization
+ */
+
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useWebSocket } from '@/lib/ws';
@@ -9,17 +14,18 @@ import { PositionsTable } from '@/components/PositionsTable';
 import { ManualSignalForm } from '@/components/ManualSignalForm';
 import { GearIndicator } from '@/components/GearIndicator';
 import { TrackView } from '@/components/TrackView';
-import { TelemetrySidebar } from '@/components/TelemetrySidebar';
+import { TelemetrySidebar} from '@/components/TelemetrySidebar';
 import { LearningDashboard } from '@/components/LearningDashboard';
 import { useEffect, useState, useMemo } from 'react';
 import { WSEvent } from '@/lib/types';
 import type { GearType } from '@/lib/types';
+import { Activity, TrendingUp, Shield, Target, Zap, BarChart3 } from 'lucide-react';
 
 export default function Dashboard() {
   const { message, isConnected } = useWebSocket();
   const addWSEvent = useUIStore((state) => state.addWSEvent);
   const addToast = useUIStore((state) => state.addToast);
-  const [activeTab, setActiveTab] = useState<'overview' | 'trading' | 'learning'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'trading' | 'analytics'>('overview');
 
   // System status (includes gear state)
   const { data: status, isLoading: statusLoading } = useQuery({
@@ -122,31 +128,31 @@ export default function Dashboard() {
         case 'guard_reject':
           addToast({
             type: 'warning',
-            message: `Signal rejected: ${event.reason || 'Unknown reason'}`,
+            message: `⚠️ Signal rejected: ${event.reason || 'Unknown reason'}`,
           });
           break;
         case 'order_submitted':
           addToast({
             type: 'info',
-            message: `Order submitted: ${event.order_id}`,
+            message: `📤 Order submitted: ${event.order_id}`,
           });
           break;
         case 'fill':
           addToast({
             type: 'success',
-            message: `Order filled: ${event.fill?.broker_order_id || 'Unknown'}`,
+            message: `✅ Order filled: ${event.fill?.broker_order_id || 'Unknown'}`,
           });
           break;
         case 'flatten_all':
           addToast({
             type: 'warning',
-            message: `All positions flattened: ${event.reason || 'Unknown reason'}`,
+            message: `🛑 All positions flattened: ${event.reason || 'Unknown reason'}`,
           });
           break;
         case 'regime_change':
           addToast({
             type: 'info',
-            message: `Regime changed to: ${event.regime}`,
+            message: `🔄 Regime changed to: ${event.regime}`,
           });
           break;
         case 'gear_change':
@@ -162,67 +168,131 @@ export default function Dashboard() {
   const currentGear = (status?.gear || 'N') as GearType;
   const currentRegime = status?.current_regime || 'UNKNOWN';
 
+  // Quick stats for header
+  const quickStats = {
+    dailyPnL: status?.daily_pnl_r || 0,
+    weeklyPnL: status?.weekly_pnl_r || 0,
+    openPositions: positionsData?.positions?.length || 0,
+    openOrders: ordersData?.orders?.length || 0,
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-black text-gradient bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
-            Transmission™
-          </h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Adaptive Risk Management • Beyond Candlesticks
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium backdrop-blur-md ${
-            isConnected
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-            {isConnected ? 'Live' : 'Disconnected'}
+    <div className="min-h-screen">
+      {/* Professional Header */}
+      <header className="glass-strong sticky top-0 z-50 border-b border-white/10">
+        <div className="container-2xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo & Brand */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center">
+                  <Zap className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black text-gradient">
+                    VEGUS
+                  </h1>
+                  <p className="text-xs text-neutral-400">Adaptive Trading Platform</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="hidden lg:flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-green-400" />
+                </div>
+                <div>
+                  <div className="text-xs text-neutral-400">Daily P&L</div>
+                  <div className={`text-sm font-bold ${quickStats.dailyPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {quickStats.dailyPnL >= 0 ? '+' : ''}{quickStats.dailyPnL.toFixed(2)}R
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                  <Activity className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <div className="text-xs text-neutral-400">Positions</div>
+                  <div className="text-sm font-bold text-white">{quickStats.openPositions}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <Target className="w-4 h-4 text-purple-400" />
+                </div>
+                <div>
+                  <div className="text-xs text-neutral-400">Orders</div>
+                  <div className="text-sm font-bold text-white">{quickStats.openOrders}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Connection Status */}
+            <div className="flex items-center gap-4">
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium glass ${
+                isConnected
+                  ? 'border border-green-500/30'
+                  : 'border border-red-500/30'
+              }`}>
+                <div className={isConnected ? 'status-online' : 'status-offline'} />
+                <span className={isConnected ? 'text-green-400' : 'text-red-400'}>
+                  {isConnected ? 'Live' : 'Disconnected'}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Tab Navigation */}
-      <div className="glass rounded-2xl p-2 inline-flex gap-2">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-6 py-2 rounded-xl font-medium transition-all ${
-            activeTab === 'overview'
-              ? 'bg-white/20 text-white shadow-lg'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          onClick={() => setActiveTab('trading')}
-          className={`px-6 py-2 rounded-xl font-medium transition-all ${
-            activeTab === 'trading'
-              ? 'bg-white/20 text-white shadow-lg'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          Trading
-        </button>
-        <button
-          onClick={() => setActiveTab('learning')}
-          className={`px-6 py-2 rounded-xl font-medium transition-all ${
-            activeTab === 'learning'
-              ? 'bg-white/20 text-white shadow-lg'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
-        >
-          Learning
-        </button>
-      </div>
+      {/* Main Content */}
+      <main className="container-2xl mx-auto px-6 py-8">
 
-      {/* Overview Tab - Transmission UI */}
-      {activeTab === 'overview' && (
-        <div className="grid grid-cols-12 gap-6">
+        {/* Navigation Tabs */}
+        <div className="mb-8 glass rounded-2xl p-2 inline-flex gap-2">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all ${
+              activeTab === 'overview'
+                ? 'bg-white/20 text-white shadow-lg'
+                : 'text-neutral-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('trading')}
+            className={`px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all ${
+              activeTab === 'trading'
+                ? 'bg-white/20 text-white shadow-lg'
+                : 'text-neutral-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            Trading
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all ${
+              activeTab === 'analytics'
+                ? 'bg-white/20 text-white shadow-lg'
+                : 'text-neutral-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            Analytics
+          </button>
+        </div>
+
+        {/* Overview Tab - VEGUS Transmission UI */}
+        {activeTab === 'overview' && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="grid grid-cols-12 gap-6">
           {/* Panel A: Track View (Main - 8 cols) */}
           <div className="col-span-12 lg:col-span-8">
             <TrackView
@@ -251,33 +321,50 @@ export default function Dashboard() {
               <KillSwitch />
             </div>
           </div>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
 
-      {/* Trading Tab - Orders & Positions */}
-      {activeTab === 'trading' && (
-        <div className="space-y-6">
+        {/* Trading Tab - Orders & Positions */}
+        {activeTab === 'trading' && (
+          <div className="space-y-8 animate-fade-in">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <OrdersTable orders={ordersData?.orders || []} isLoading={ordersLoading} />
             <PositionsTable positions={positionsData?.positions || []} isLoading={positionsLoading} />
           </div>
 
-          {/* Manual Signal Submission Section */}
-          <div className="mt-8">
-            <ManualSignalForm />
+            {/* Manual Signal Submission Section */}
+            <div>
+              <ManualSignalForm />
+            </div>
+          </div>
+        )}
+
+        {/* Analytics Tab - Performance Analysis */}
+        {activeTab === 'analytics' && (
+          <div className="space-y-8 animate-fade-in">
+            <LearningDashboard
+              gearPerformance={gearPerformance || []}
+              recentInsights={recentInsights}
+            />
+          </div>
+        )}
+      </main>
+
+      {/* Professional Footer */}
+      <footer className="border-t border-white/10 mt-16">
+        <div className="container-2xl mx-auto px-6 py-6">
+          <div className="flex items-center justify-between text-sm text-neutral-400">
+            <div>
+              © 2025 VEGUS. Adaptive Trading Platform.
+            </div>
+            <div className="flex items-center gap-6">
+              <span>API v1.0</span>
+              <span>Build 1.0.0</span>
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Learning Tab - Performance Analysis */}
-      {activeTab === 'learning' && (
-        <div className="space-y-6">
-          <LearningDashboard
-            gearPerformance={gearPerformance || []}
-            recentInsights={recentInsights}
-          />
-        </div>
-      )}
+      </footer>
     </div>
   );
 }
