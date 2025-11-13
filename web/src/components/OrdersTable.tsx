@@ -1,7 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Order } from '@/lib/types';
-import { formatNumber, formatDateTime } from '@/lib/utils';
+// Order type - defined inline since backend response may vary
+interface Order {
+  order_id: string;
+  symbol: string;
+  side: 'buy' | 'sell' | 'BUY' | 'SELL';
+  order_type?: string;
+  quantity: number;
+  filled_qty?: number;
+  price?: number;
+  avg_price?: number;
+  status: string;
+  timestamp: string;
+}
+import { formatNumber } from '@/lib/utils';
 
 interface OrdersTableProps {
   orders: Order[];
@@ -65,7 +77,7 @@ export function OrdersTable({ orders, isLoading }: OrdersTableProps) {
                   </span>
                 </TableCell>
                 <TableCell>{formatNumber(order.quantity)}</TableCell>
-                <TableCell>{formatNumber(order.filled_qty)}</TableCell>
+                <TableCell>{order.filled_qty !== undefined ? formatNumber(order.filled_qty) : '—'}</TableCell>
                 <TableCell>{order.order_type}</TableCell>
                 <TableCell>
                   <span className={`px-2 py-1 rounded text-xs ${

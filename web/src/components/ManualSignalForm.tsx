@@ -12,7 +12,24 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { ManualSignalRequest, ManualSignalResponse } from '@/lib/types';
+// ManualSignal types - defined inline since backend response may vary
+interface ManualSignalRequest {
+  symbol: string;
+  side: 'LONG' | 'SHORT';
+  entry: string;
+  stop: string;
+  target: string;
+  size: string;
+  strategy: string;
+  notes?: string;
+}
+
+interface ManualSignalResponse {
+  success: boolean;
+  message: string;
+  signal_id?: string;
+  reason?: string;
+}
 
 interface FormData {
   symbol: string;
@@ -103,14 +120,12 @@ export function ManualSignalForm() {
     const payload: ManualSignalRequest = {
       symbol: formData.symbol,
       side: formData.side,
-      entry: parseFloat(formData.entry),
-      stop: parseFloat(formData.stop),
-      target: parseFloat(formData.target),
-      contracts: parseInt(formData.contracts) || undefined,
-      strategy: formData.strategy || undefined,
-      confidence: parseFloat(formData.confidence) || undefined,
+      entry: formData.entry,
+      stop: formData.stop,
+      target: formData.target,
+      size: formData.contracts || '1',
+      strategy: formData.strategy || 'Manual',
       notes: formData.notes || undefined,
-      asset_class: formData.asset_class || undefined,
     };
 
     submitSignal.mutate(payload);

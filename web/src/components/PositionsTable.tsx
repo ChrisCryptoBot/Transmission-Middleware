@@ -1,6 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Position } from '@/lib/types';
+// Position type - defined inline since backend response may vary
+interface Position {
+  position_id: string;
+  symbol: string;
+  side: 'long' | 'short';
+  size: number;
+  entry_price: number;
+  current_price?: number;
+  unrealized_pnl?: number;
+  unrealized_pnl_r?: number;
+}
 import { formatNumber, formatR } from '@/lib/utils';
 
 interface PositionsTableProps {
@@ -55,13 +65,13 @@ export function PositionsTable({ positions, isLoading }: PositionsTableProps) {
             {positions.map((position, index) => (
               <TableRow key={`${position.symbol}-${index}`}>
                 <TableCell className="font-medium">{position.symbol}</TableCell>
-                <TableCell>{formatNumber(position.quantity)}</TableCell>
-                <TableCell>{formatNumber(position.avg_price)}</TableCell>
-                <TableCell className={position.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  {formatNumber(position.unrealized_pnl)}
+                <TableCell>{formatNumber(position.size)}</TableCell>
+                <TableCell>{formatNumber(position.entry_price)}</TableCell>
+                <TableCell className={(position.unrealized_pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {position.unrealized_pnl !== undefined ? formatNumber(position.unrealized_pnl) : '—'}
                 </TableCell>
-                <TableCell className={position.unrealized_pnl_r >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  {formatR(position.unrealized_pnl_r)}
+                <TableCell className={(position.unrealized_pnl_r ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {position.unrealized_pnl_r !== undefined ? formatR(position.unrealized_pnl_r) : '—'}
                 </TableCell>
               </TableRow>
             ))}

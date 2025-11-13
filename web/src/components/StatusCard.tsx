@@ -57,6 +57,34 @@ export function StatusCard({ status, isLoading }: StatusCardProps) {
           </div>
         </div>
         
+        {/* Gear State (if available) */}
+        {status.gear && (
+          <div>
+            <div className="text-sm text-muted-foreground">Gear</div>
+            <div className="flex items-center gap-2">
+              <div className={`text-2xl font-bold ${
+                status.gear === 'P' ? 'text-red-600' :
+                status.gear === 'R' ? 'text-orange-600' :
+                status.gear === 'N' ? 'text-gray-600' :
+                status.gear === 'D' ? 'text-green-600' :
+                'text-yellow-600'
+              }`}>
+                {status.gear}
+              </div>
+              {status.gear_risk_multiplier !== undefined && (
+                <div className="text-sm text-muted-foreground">
+                  ({(status.gear_risk_multiplier * 100).toFixed(0)}%)
+                </div>
+              )}
+            </div>
+            {status.gear_reason && (
+              <div className="text-xs text-muted-foreground mt-1">
+                {status.gear_reason}
+              </div>
+            )}
+          </div>
+        )}
+
         <div>
           <div className="text-sm text-muted-foreground">Regime</div>
           <div className="text-xl font-medium">

@@ -2,7 +2,19 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TradeResponse } from '@/lib/types';
+// Trade type - defined inline since backend response may vary
+interface TradeResponse {
+  trade_id: string;
+  timestamp_entry: string;
+  symbol: string;
+  trade_type: 'Long' | 'Short';
+  strategy_used: string;
+  entry_price: number;
+  exit_price?: number;
+  position_size: number;
+  win_loss?: 'Win' | 'Loss';
+  result_r?: number;
+}
 import { formatNumber, formatR, formatDateTime } from '@/lib/utils';
 import { PerformanceCharts } from '@/components/PerformanceCharts';
 

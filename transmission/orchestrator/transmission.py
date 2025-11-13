@@ -37,9 +37,11 @@ from transmission.telemetry.multi_tf_fusion import MultiTimeframeFusion
 from transmission.risk.mental_governor import MentalGovernor, MentalState
 from transmission.risk.news_flat import NewsFlat
 from transmission.analytics.journal_analytics import JournalAnalytics
+from transmission.orchestrator.gear_state import GearStateMachine, GearContext, GearState
 from transmission.database import Database
 from transmission.config.config_loader import ConfigLoader
 from transmission.config.instrument_specs import InstrumentSpecService
+from transmission.api.websocket import broadcast_gear_change
 from datetime import datetime
 
 
@@ -143,7 +145,10 @@ class TransmissionOrchestrator:
         self.mental_governor = MentalGovernor()
         self.news_flat = NewsFlat()
         self.journal_analytics = JournalAnalytics(database=database if database else Database(db_path=db_path))
-        
+
+        # Gear State Machine (Transmission visualization)
+        self.gear_state_machine = GearStateMachine(database=database if database else Database(db_path=db_path))
+
         # Database
         if database is None:
             database = Database(db_path=db_path)
@@ -438,6 +443,47 @@ class TransmissionOrchestrator:
                     "direction": signal.direction
                 }
 
+            # Step 3.5: Gear State Calculation (NEW - Transmission Visualization)
+            gear_context = self._build_gear_context(regime=signal.regime if hasattr(signal, 'regime') else None)
+            
+            # Store previous gear to detect shifts
+            previous_gear = self.gear_state_machine.get_current_gear()
+            
+            current_gear, gear_reason = self.gear_state_machine.shift(gear_context)
+            
+            # Broadcast gear change if shift occurred
+            if previous_gear != current_gear:
+                broadcast_gear_change(
+                    from_gear=previous_gear.value,
+                    to_gear=current_gear.value,
+                    reason=gear_reason,
+                    context={
+                        'daily_r': gear_context.daily_r,
+                        'weekly_r': gear_context.weekly_r,
+                        'consecutive_losses': gear_context.consecutive_losses,
+                        'regime': gear_context.regime,
+                        'mental_state': gear_context.mental_state,
+                        'volatility_percentile': gear_context.volatility_percentile,
+                        'dll_remaining': gear_context.dll_remaining,
+                    }
+                )
+
+            logger.info(f"Current gear: {current_gear.value} ({gear_reason})")
+
+            # If gear is PARK, block trading immediately
+            if current_gear == GearState.PARK:
+                logger.warning(f"Trading blocked by Gear State: {current_gear.value} - {gear_reason}")
+                return {
+                    "status": "rejected",
+                    "action": "REJECT",
+                    "reason": f"Gear: {current_gear.value} - {gear_reason}",
+                    "signal_id": f"sig_{int(signal.timestamp.timestamp())}",
+                    "symbol": signal.symbol,
+                    "direction": signal.direction,
+                    "gear": current_gear.value,
+                    "gear_reason": gear_reason
+                }
+
             # Step 4: Position Sizing (Simplified)
             # Use signal's entry and stop to calculate risk
             risk_dollars = self.risk_governor.get_current_r()
@@ -445,6 +491,11 @@ class TransmissionOrchestrator:
 
             # Apply mental state multiplier
             risk_dollars *= mental_result.size_multiplier
+
+            # Apply GEAR multiplier (NEW - Transmission adaptive sizing)
+            gear_multiplier = self.gear_state_machine.get_risk_multiplier()
+            risk_dollars *= gear_multiplier
+            logger.info(f"Gear {current_gear.value} risk multiplier: {gear_multiplier:.2f}x (effective risk: ${risk_dollars:.2f})")
 
             # Calculate contracts (simplified - no ATR normalization for webhook signals)
             if stop_distance_points > 0:
@@ -522,10 +573,12 @@ class TransmissionOrchestrator:
                     "direction": signal.direction
                 }
 
-            # Step 7: Execute Trade
+            # Step 7: Execute Trade (with gear state)
             order_id = self.execution_engine.place_signal(
                 signal=signal,
-                qty=float(signal.contracts)
+                qty=float(signal.contracts),
+                gear_at_entry=current_gear.value,
+                gear_shift_reason=gear_reason
             )
 
             if order_id is None:
@@ -553,7 +606,7 @@ class TransmissionOrchestrator:
                 f"(order_id: {order_id})"
             )
 
-            # Return success response
+            # Return success response with gear state
             return {
                 "status": "processed",
                 "action": "TRADE",
@@ -565,7 +618,10 @@ class TransmissionOrchestrator:
                 "contracts": signal.contracts,
                 "entry_price": signal.entry_price,
                 "stop_price": signal.stop_price,
-                "target_price": signal.target_price
+                "target_price": signal.target_price,
+                "gear": current_gear.value,
+                "gear_reason": gear_reason,
+                "gear_multiplier": gear_multiplier
             }
 
         except Exception as e:
@@ -582,14 +638,87 @@ class TransmissionOrchestrator:
     def _select_strategy(self, regime: str) -> Optional[BaseStrategy]:
         """
         Select strategy based on regime.
-        
+
         Args:
             regime: Current market regime
-            
+
         Returns:
             Strategy instance or None if no strategy for regime
         """
         return self.strategies.get(regime)
+
+    def _build_gear_context(self, regime: Optional[str] = None, features: Optional[MarketFeatures] = None) -> GearContext:
+        """
+        Build GearContext from current system state.
+
+        Args:
+            regime: Current market regime (optional)
+            features: Market features (optional, for volatility)
+
+        Returns:
+            GearContext with current state snapshot
+        """
+        # Get risk metrics from RiskGovernor
+        daily_r = self.risk_governor.get_daily_r()
+        weekly_r = self.risk_governor.get_weekly_r()
+
+        # Get consecutive losses from journal analytics
+        recent_trades = self.database.get_recent_trades(limit=10)
+        consecutive_losses = 0
+        for trade in recent_trades:
+            if trade.get('win_loss') == 'Loss':
+                consecutive_losses += 1
+            else:
+                break  # Stop at first non-loss
+
+        # Get drawdown from journal analytics
+        performance = self.journal_analytics.calculate_rolling_metrics(window=20)
+        current_drawdown = performance.get('current_drawdown_r', 0.0)
+
+        # Get volatility percentile (if features available)
+        volatility_percentile = 0.5  # Default to median
+        if features is not None and hasattr(features, 'atr_14') and hasattr(features, 'baseline_atr'):
+            if features.baseline_atr > 0:
+                volatility_percentile = min(features.atr_14 / features.baseline_atr, 2.0) / 2.0
+
+        # Get mental state
+        mental_result = self.mental_governor.evaluate()
+        mental_state = mental_result.current_state.value
+
+        # Get DLL remaining
+        dll_remaining = self.constraint_engine.get_dll_constraint()
+
+        # Check tripwires
+        tripwire = self.risk_governor.check_tripwires()
+        tripwire_active = not tripwire.can_trade
+
+        # Check trading session (simplified - assume always in session for now)
+        in_trading_session = True  # TODO: Add session time logic
+
+        # Check news blackout
+        news_blackout_active = False  # TODO: Check if any symbols are in blackout
+
+        # Kill switch (manual emergency stop)
+        kill_switch_active = self.risk_governor.is_kill_switch_active() if hasattr(self.risk_governor, 'is_kill_switch_active') else False
+
+        # Get open positions count
+        positions_open = len(self.current_positions)
+
+        return GearContext(
+            daily_r=daily_r,
+            weekly_r=weekly_r,
+            consecutive_losses=consecutive_losses,
+            current_drawdown=current_drawdown,
+            regime=regime or "UNKNOWN",
+            volatility_percentile=volatility_percentile,
+            mental_state=mental_state,
+            dll_remaining=dll_remaining,
+            tripwire_active=tripwire_active,
+            in_trading_session=in_trading_session,
+            news_blackout_active=news_blackout_active,
+            kill_switch_active=kill_switch_active,
+            positions_open=positions_open
+        )
     
     def record_trade_result(
         self,
