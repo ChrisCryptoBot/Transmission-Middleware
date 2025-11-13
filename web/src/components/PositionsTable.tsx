@@ -55,13 +55,13 @@ export function PositionsTable({ positions, isLoading }: PositionsTableProps) {
             {positions.map((position, index) => (
               <TableRow key={`${position.symbol}-${index}`}>
                 <TableCell className="font-medium">{position.symbol}</TableCell>
-                <TableCell>{formatNumber(position.quantity)}</TableCell>
-                <TableCell>{formatNumber(position.avg_price)}</TableCell>
-                <TableCell className={position.unrealized_pnl >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  {formatNumber(position.unrealized_pnl)}
+                <TableCell>{formatNumber(position.quantity || position.contracts, 0)}</TableCell>
+                <TableCell>{formatNumber(position.avg_price || position.entry_price, 2)}</TableCell>
+                <TableCell className={(position.unrealized_pnl || 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {formatNumber(position.unrealized_pnl || 0, 2)}
                 </TableCell>
-                <TableCell className={position.unrealized_pnl_r >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  {formatR(position.unrealized_pnl_r)}
+                <TableCell className={(position.unrealized_pnl_r || 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  {formatR(position.unrealized_pnl_r || 0)}
                 </TableCell>
               </TableRow>
             ))}

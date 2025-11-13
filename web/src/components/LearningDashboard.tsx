@@ -10,7 +10,7 @@
 
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { TrendingUp, TrendingDown, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { TrendingUp, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 
 type GearType = 'P' | 'R' | 'N' | 'D' | 'L';
 type RegimeType = 'TREND' | 'RANGE' | 'VOLATILE';

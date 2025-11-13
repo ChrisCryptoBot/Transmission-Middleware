@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Order } from '@/lib/types';
-import { formatNumber, formatDateTime } from '@/lib/utils';
+import { formatNumber } from '@/lib/utils';
 
 interface OrdersTableProps {
   orders: Order[];
@@ -60,13 +60,13 @@ export function OrdersTable({ orders, isLoading }: OrdersTableProps) {
                 <TableCell className="font-mono text-xs">{order.order_id}</TableCell>
                 <TableCell>{order.symbol}</TableCell>
                 <TableCell>
-                  <span className={order.side === 'BUY' ? 'text-green-600' : 'text-red-600'}>
+                  <span className={order.side === 'LONG' ? 'text-green-600' : 'text-red-600'}>
                     {order.side}
                   </span>
                 </TableCell>
-                <TableCell>{formatNumber(order.quantity)}</TableCell>
-                <TableCell>{formatNumber(order.filled_qty)}</TableCell>
-                <TableCell>{order.order_type}</TableCell>
+                <TableCell>{formatNumber(order.quantity || order.contracts, 0)}</TableCell>
+                <TableCell>{formatNumber(order.filled_qty || 0, 0)}</TableCell>
+                <TableCell>{order.order_type || 'MARKET'}</TableCell>
                 <TableCell>
                   <span className={`px-2 py-1 rounded text-xs ${
                     order.status === 'FILLED' ? 'bg-green-100 text-green-800' :
@@ -76,7 +76,7 @@ export function OrdersTable({ orders, isLoading }: OrdersTableProps) {
                     {order.status}
                   </span>
                 </TableCell>
-                <TableCell>{order.avg_price ? formatNumber(order.avg_price) : '—'}</TableCell>
+                <TableCell>{order.avg_price ? formatNumber(order.avg_price, 2) : '—'}</TableCell>
               </TableRow>
             ))}
           </TableBody>

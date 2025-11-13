@@ -63,17 +63,17 @@ export default function Trades() {
                 {trades.map((trade) => (
                   <TableRow key={trade.trade_id}>
                     <TableCell className="font-mono text-xs">{trade.trade_id}</TableCell>
-                    <TableCell className="text-xs">{formatDateTime(trade.timestamp_entry)}</TableCell>
+                    <TableCell className="text-xs">{trade.timestamp_entry ? formatDateTime(trade.timestamp_entry) : formatDateTime(trade.entry_time)}</TableCell>
                     <TableCell>{trade.symbol}</TableCell>
                     <TableCell>
-                      <span className={trade.trade_type === 'Long' ? 'text-green-600' : 'text-red-600'}>
-                        {trade.trade_type}
+                      <span className={(trade.trade_type || trade.direction) === 'LONG' ? 'text-green-600' : 'text-red-600'}>
+                        {trade.trade_type || trade.direction}
                       </span>
                     </TableCell>
-                    <TableCell>{trade.strategy_used}</TableCell>
+                    <TableCell>{trade.strategy_used || '-'}</TableCell>
                     <TableCell>{formatNumber(trade.entry_price)}</TableCell>
                     <TableCell>{trade.exit_price ? formatNumber(trade.exit_price) : '—'}</TableCell>
-                    <TableCell>{trade.position_size}</TableCell>
+                    <TableCell>{trade.position_size || trade.contracts}</TableCell>
                     <TableCell>
                       {trade.win_loss && (
                         <span className={`px-2 py-1 rounded text-xs ${
@@ -83,8 +83,8 @@ export default function Trades() {
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className={trade.result_r && trade.result_r >= 0 ? 'text-green-600' : 'text-red-600'}>
-                      {trade.result_r ? formatR(trade.result_r) : '—'}
+                    <TableCell className={(trade.result_r || trade.pnl_r || 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      {trade.result_r ? formatR(trade.result_r) : trade.pnl_r ? formatR(trade.pnl_r) : '—'}
                     </TableCell>
                   </TableRow>
                 ))}

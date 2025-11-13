@@ -157,7 +157,7 @@ export function TrackView({ tradeHistory, currentGear, currentRegime, className 
                 strokeWidth={3}
                 dot={(props: any) => {
                   const { cx, cy, payload } = props;
-                  const gear = payload.gear;
+                  const gear = payload.gear as GearType;
                   const winLoss = payload.win_loss;
 
                   return (
@@ -167,18 +167,18 @@ export function TrackView({ tradeHistory, currentGear, currentRegime, className 
                         cx={cx}
                         cy={cy}
                         r={winLoss ? 6 : 4}
-                        fill={winLoss === 'Win' ? '#22c55e' : winLoss === 'Loss' ? '#ef4444' : GEAR_MARKERS[gear]?.color}
+                        fill={winLoss === 'Win' ? '#22c55e' : winLoss === 'Loss' ? '#ef4444' : (gear && GEAR_MARKERS[gear] ? GEAR_MARKERS[gear].color : '#6b7280')}
                         stroke="#fff"
                         strokeWidth={2}
                         opacity={0.9}
                       />
 
                       {/* Gear marker label */}
-                      {gear && (
+                      {gear && GEAR_MARKERS[gear] && (
                         <text
                           x={cx}
                           y={cy - 12}
-                          fill={GEAR_MARKERS[gear]?.color}
+                          fill={GEAR_MARKERS[gear].color}
                           fontSize={10}
                           fontWeight="bold"
                           textAnchor="middle"

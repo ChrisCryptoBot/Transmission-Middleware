@@ -49,12 +49,12 @@ export default function Dashboard() {
     refetchInterval: 10000,
   });
 
-  // Gear history
-  const { data: gearHistory } = useQuery({
-    queryKey: ['gear-history'],
-    queryFn: async () => (await api.get('/system/gear/history?limit=20')).data,
-    refetchInterval: 5000,
-  });
+  // Gear history (for future use)
+  // const { data: gearHistory } = useQuery({
+  //   queryKey: ['gear-history'],
+  //   queryFn: async () => (await api.get('/system/gear/history?limit=20')).data,
+  //   refetchInterval: 5000,
+  // });
 
   // Trades for track view
   const { data: tradesData } = useQuery({
