@@ -45,11 +45,11 @@ interface LearningDashboardProps {
 }
 
 const GEAR_COLORS: Record<GearType, string> = {
-  P: '#ef4444',
-  R: '#eab308',
-  N: '#9ca3af',
-  D: '#22c55e',
-  L: '#3b82f6'
+  P: '#f87171', // red-400
+  R: '#fbbf24', // amber-400
+  N: '#a3a3a3', // neutral-400
+  D: '#4ade80', // green-400
+  L: '#60a5fa'  // blue-400
 };
 
 const GEAR_LABELS: Record<GearType, string> = {
@@ -65,14 +65,14 @@ export function LearningDashboard({ gearPerformance, recentInsights, className =
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
       <div className="glass rounded-2xl p-6">
-        <h2 className="text-2xl font-bold text-gradient mb-1">Learning Dashboard</h2>
-        <p className="text-sm text-gray-400">Performance analysis & trade insights</p>
+        <h2 className="text-2xl font-bold text-gradient mb-1">Analytics Dashboard</h2>
+        <p className="text-sm text-neutral-400">Performance analysis & trade insights</p>
       </div>
 
       {/* Performance by Gear */}
       <div className="glass rounded-2xl p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-green-500" />
+          <TrendingUp className="w-5 h-5 text-green-400" />
           Performance by Gear
         </h3>
 
@@ -124,27 +124,27 @@ export function LearningDashboard({ gearPerformance, recentInsights, className =
               >
                 {perf.gear}
               </div>
-              <div className="text-xs text-gray-500 uppercase mb-2">{GEAR_LABELS[perf.gear]}</div>
+              <div className="text-xs text-neutral-500 uppercase mb-2">{GEAR_LABELS[perf.gear]}</div>
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Trades</span>
+                  <span className="text-neutral-400">Trades</span>
                   <span className="text-white font-medium">{perf.trades}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Win Rate</span>
-                  <span className={`font-medium ${perf.win_rate >= 60 ? 'text-green-500' : perf.win_rate >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
+                  <span className="text-neutral-400">Win Rate</span>
+                  <span className={`font-medium ${perf.win_rate >= 60 ? 'text-green-400' : perf.win_rate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
                     {perf.win_rate.toFixed(0)}%
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">P/F</span>
-                  <span className={`font-medium ${perf.profit_factor >= 1.5 ? 'text-green-500' : perf.profit_factor >= 1.0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                  <span className="text-neutral-400">P/F</span>
+                  <span className={`font-medium ${perf.profit_factor >= 1.5 ? 'text-green-400' : perf.profit_factor >= 1.0 ? 'text-amber-400' : 'text-red-400'}`}>
                     {perf.profit_factor.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-400">Total R</span>
-                  <span className={`font-medium ${perf.total_r >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  <span className="text-neutral-400">Total R</span>
+                  <span className={`font-medium ${perf.total_r >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {perf.total_r >= 0 ? '+' : ''}{perf.total_r.toFixed(1)}R
                   </span>
                 </div>
@@ -157,7 +157,7 @@ export function LearningDashboard({ gearPerformance, recentInsights, className =
       {/* Recent Trade Insights */}
       <div className="glass rounded-2xl p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-blue-500" />
+          <AlertCircle className="w-5 h-5 text-blue-400" />
           Recent Trade Insights
         </h3>
 
@@ -174,9 +174,9 @@ export function LearningDashboard({ gearPerformance, recentInsights, className =
                 <div className="flex items-center gap-3">
                   {/* Win/Loss Indicator */}
                   {insight.win_loss === 'Win' ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <CheckCircle2 className="w-5 h-5 text-green-400" />
                   ) : (
-                    <XCircle className="w-5 h-5 text-red-500" />
+                    <XCircle className="w-5 h-5 text-red-400" />
                   )}
 
                   {/* Trade Info */}
@@ -184,14 +184,14 @@ export function LearningDashboard({ gearPerformance, recentInsights, className =
                     <div className="font-medium text-white">
                       {insight.symbol} {insight.direction}
                     </div>
-                    <div className="text-xs text-gray-400">
+                    <div className="text-xs text-neutral-400">
                       {new Date(insight.timestamp).toLocaleString()}
                     </div>
                   </div>
                 </div>
 
                 {/* Result R */}
-                <div className={`text-lg font-bold ${insight.result_r >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                <div className={`text-lg font-bold ${insight.result_r >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {insight.result_r >= 0 ? '+' : ''}{insight.result_r.toFixed(2)}R
                 </div>
               </div>
@@ -225,7 +225,7 @@ export function LearningDashboard({ gearPerformance, recentInsights, className =
 
               {/* Reason */}
               {insight.acceptance_reason && (
-                <div className="text-xs text-gray-400 mt-2">
+                <div className="text-xs text-neutral-400 mt-2">
                   ✓ {insight.acceptance_reason}
                 </div>
               )}
@@ -242,22 +242,22 @@ export function LearningDashboard({ gearPerformance, recentInsights, className =
       {/* Key Insights Summary */}
       <div className="grid grid-cols-3 gap-4">
         <div className="glass rounded-xl p-4 text-center">
-          <div className="text-3xl font-bold text-green-500 mb-1">
+          <div className="text-3xl font-bold text-green-400 mb-1">
             {((gearPerformance.find(p => p.gear === 'D')?.win_rate || 0)).toFixed(0)}%
           </div>
-          <div className="text-xs text-gray-400 uppercase tracking-wider">Drive Win Rate</div>
+          <div className="text-xs text-neutral-400 uppercase tracking-wider">Drive Win Rate</div>
         </div>
         <div className="glass rounded-xl p-4 text-center">
-          <div className="text-3xl font-bold text-blue-500 mb-1">
+          <div className="text-3xl font-bold text-blue-400 mb-1">
             {((gearPerformance.find(p => p.gear === 'L')?.win_rate || 0)).toFixed(0)}%
           </div>
-          <div className="text-xs text-gray-400 uppercase tracking-wider">Low Win Rate</div>
+          <div className="text-xs text-neutral-400 uppercase tracking-wider">Low Win Rate</div>
         </div>
         <div className="glass rounded-xl p-4 text-center">
-          <div className="text-3xl font-bold text-yellow-500 mb-1">
+          <div className="text-3xl font-bold text-amber-400 mb-1">
             {((gearPerformance.find(p => p.gear === 'R')?.win_rate || 0)).toFixed(0)}%
           </div>
-          <div className="text-xs text-gray-400 uppercase tracking-wider">Reverse Win Rate</div>
+          <div className="text-xs text-neutral-400 uppercase tracking-wider">Reverse Win Rate</div>
         </div>
       </div>
     </div>

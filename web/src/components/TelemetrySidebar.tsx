@@ -48,11 +48,11 @@ function Gauge({
   const percentage = Math.min((value / max) * 100, 100);
 
   const colorMap = {
-    red: { bg: 'from-red-500 to-red-600', glow: 'shadow-[0_0_20px_rgba(239,68,68,0.5)]' },
-    yellow: { bg: 'from-yellow-500 to-yellow-600', glow: 'shadow-[0_0_20px_rgba(234,179,8,0.5)]' },
-    green: { bg: 'from-green-500 to-green-600', glow: 'shadow-[0_0_20px_rgba(34,197,94,0.5)]' },
-    blue: { bg: 'from-blue-500 to-blue-600', glow: 'shadow-[0_0_20px_rgba(59,130,246,0.5)]' },
-    purple: { bg: 'from-purple-500 to-purple-600', glow: 'shadow-[0_0_20px_rgba(168,85,247,0.5)]' }
+    red: { bg: 'from-red-400 to-red-400', glow: 'shadow-[0_0_20px_rgba(248,113,113,0.5)]' },
+    yellow: { bg: 'from-amber-400 to-amber-400', glow: 'shadow-[0_0_20px_rgba(251,191,36,0.5)]' },
+    green: { bg: 'from-green-400 to-green-400', glow: 'shadow-[0_0_20px_rgba(74,222,128,0.5)]' },
+    blue: { bg: 'from-blue-400 to-blue-400', glow: 'shadow-[0_0_20px_rgba(96,165,250,0.5)]' },
+    purple: { bg: 'from-purple-400 to-purple-400', glow: 'shadow-[0_0_20px_rgba(192,132,252,0.5)]' }
   };
 
   const sizeMap = {
@@ -72,8 +72,8 @@ function Gauge({
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Icon className={`w-4 h-4 text-${color}-500`} />
-          <span className={`${sizes.label} font-medium text-gray-300 uppercase tracking-wider`}>
+          <Icon className={`w-4 h-4 text-${color}-400`} />
+          <span className={`${sizes.label} font-medium text-neutral-300 uppercase tracking-wider`}>
             {label}
           </span>
         </div>
@@ -109,8 +109,8 @@ function Gauge({
           />
           <defs>
             <linearGradient id={`gradient-${color}`} x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor={`var(--${color}-500)`} />
-              <stop offset="100%" stopColor={`var(--${color}-600)`} />
+              <stop offset="0%" stopColor={`var(--${color}-400)`} />
+              <stop offset="100%" stopColor={`var(--${color}-500)`} />
             </linearGradient>
           </defs>
         </svg>
@@ -118,7 +118,7 @@ function Gauge({
         {/* Center value */}
         <div className="relative z-10 text-center">
           <motion.div
-            className={`${sizes.value} font-bold text-${color}-500`}
+            className={`${sizes.value} font-bold text-${color}-400`}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}
@@ -146,12 +146,12 @@ function FuelGauge({ value, max, label }: { value: number; max: number; label: s
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Droplet className={`w-4 h-4 ${isCritical ? 'text-red-500' : isLow ? 'text-yellow-500' : 'text-green-500'}`} />
-          <span className="text-sm font-medium text-gray-300 uppercase tracking-wider">
+          <Droplet className={`w-4 h-4 ${isCritical ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-green-400'}`} />
+          <span className="text-sm font-medium text-neutral-300 uppercase tracking-wider">
             {label}
           </span>
         </div>
-        <span className={`text-lg font-bold ${isCritical ? 'text-red-500' : isLow ? 'text-yellow-500' : 'text-green-500'}`}>
+        <span className={`text-lg font-bold ${isCritical ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-green-400'}`}>
           {value.toFixed(2)}R
         </span>
       </div>
@@ -160,9 +160,9 @@ function FuelGauge({ value, max, label }: { value: number; max: number; label: s
       <div className="relative h-3 bg-white/10 rounded-full overflow-hidden">
         <motion.div
           className={`h-full rounded-full ${
-            isCritical ? 'bg-gradient-to-r from-red-500 to-red-600' :
-            isLow ? 'bg-gradient-to-r from-yellow-500 to-yellow-600' :
-            'bg-gradient-to-r from-green-500 to-green-600'
+            isCritical ? 'bg-gradient-to-r from-red-400 to-red-500' :
+            isLow ? 'bg-gradient-to-r from-yellow-400 to-yellow-500' :
+            'bg-gradient-to-r from-green-400 to-green-500'
           }`}
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
@@ -172,7 +172,7 @@ function FuelGauge({ value, max, label }: { value: number; max: number; label: s
         {/* Glow effect */}
         {isCritical && (
           <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-red-500/50 to-transparent"
+            className="absolute inset-0 bg-gradient-to-r from-red-400/50 to-transparent"
             animate={{ opacity: [0.5, 0.8, 0.5] }}
             transition={{ duration: 1, repeat: Infinity }}
           />
@@ -193,7 +193,7 @@ export function TelemetrySidebar({ data, className = '' }: TelemetrySidebarProps
       {/* Header */}
       <div className="glass rounded-2xl p-4">
         <h3 className="text-lg font-bold text-gradient mb-1">System Telemetry</h3>
-        <p className="text-xs text-gray-400">Live system vitals</p>
+        <p className="text-xs text-neutral-400">Live system vitals</p>
       </div>
 
       {/* Market RPM (Volatility) */}

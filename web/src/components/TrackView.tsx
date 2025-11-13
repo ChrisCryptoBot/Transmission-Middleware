@@ -84,20 +84,20 @@ export function TrackView({ tradeHistory, currentGear, currentRegime, className 
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gradient">Track View</h2>
-            <p className="text-sm text-gray-400 mt-1">Equity progression • {currentRegime} regime</p>
+            <p className="text-sm text-neutral-400 mt-1">Equity progression • {currentRegime} regime</p>
           </div>
 
           {/* Current stats */}
           <div className="flex items-center gap-6">
             <div className="text-right">
-              <div className="text-xs text-gray-500 uppercase tracking-wider">Current Equity</div>
-              <div className={`text-2xl font-bold ${currentEquity >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="text-xs text-neutral-500 uppercase tracking-wider">Current Equity</div>
+              <div className={`text-2xl font-bold ${currentEquity >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                 {currentEquity >= 0 ? '+' : ''}{currentEquity.toFixed(2)}R
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-gray-500 uppercase tracking-wider">Drawdown</div>
-              <div className={`text-2xl font-bold ${drawdown >= -0.5 ? 'text-yellow-500' : 'text-red-500'}`}>
+              <div className="text-xs text-neutral-500 uppercase tracking-wider">Drawdown</div>
+              <div className={`text-2xl font-bold ${drawdown >= -0.5 ? 'text-amber-400' : 'text-red-400'}`}>
                 {drawdown.toFixed(2)}R
               </div>
             </div>
@@ -232,7 +232,7 @@ export function TrackView({ tradeHistory, currentGear, currentRegime, className 
 
               {/* Velocity indicator */}
               <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
-                <div className="text-xs text-gray-400 font-medium">
+                <div className="text-xs text-neutral-400 font-medium">
                   {currentRegime}
                 </div>
               </div>
@@ -244,11 +244,11 @@ export function TrackView({ tradeHistory, currentGear, currentRegime, className 
         <div className="flex items-center justify-center gap-8 mt-6 pt-6 border-t border-white/10">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-green-500" />
-            <span className="text-xs text-gray-400">Win</span>
+            <span className="text-xs text-neutral-400">Win</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-red-500" />
-            <span className="text-xs text-gray-400">Loss</span>
+            <span className="text-xs text-neutral-400">Loss</span>
           </div>
           {(['P', 'R', 'N', 'D', 'L'] as GearType[]).map(gear => (
             <div key={gear} className="flex items-center gap-2">
@@ -256,7 +256,7 @@ export function TrackView({ tradeHistory, currentGear, currentRegime, className 
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: GEAR_MARKERS[gear].color }}
               />
-              <span className="text-xs text-gray-400">{gear} Gear</span>
+              <span className="text-xs text-neutral-400">{gear} Gear</span>
             </div>
           ))}
         </div>
