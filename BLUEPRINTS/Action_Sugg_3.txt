@@ -1,0 +1,237 @@
+Amazing work. 92% compliance is legit. Here’s a tight plan to close the gaps and move from MVP → production.
+
+# What to finish next (order matters)
+
+## 1) In-Trade Manager (Tier-1, partial)
+
+**Goal:** manage the position after fill.
+
+* Trailing stop modes: ATR-trail, swing-low/high, break-even at +1R.
+* Scale-out rules: 50% at 1R, runner to 2–3R (configurable).
+* Time stop (max bars in trade).
+  **DoD:** deterministic unit tests; events (`stop_moved`, `tp_hit`, `time_exit`) logged; PnL deltas accurate.
+
+## 2) Multi-Timeframe Fusion (Tier-1, partial)
+
+**Goal:** improve regime + entries using HTF confirmation.
+
+* Compute HTF (15m/1h) ADX/ATR/VWAP from 1m stream (rolling resample).
+* Gate entries when LTF and HTF disagree (configurable).
+  **DoD:** latency <10ms per bar; togglable via config; backtest shows reduced false entries.
+
+## 3) Mental Governor (Tier-2, placeholder)
+
+**Goal:** auto-downshift size/disable entries when psychology flags trip.
+
+* Inputs: recent R drawdown, loss streak, self-reported state (1–5).
+* Output: multiplier on position size or “cool-down” period.
+  **DoD:** separate rules + combined rule; logged rationale; dashboard chip shows active state.
+
+## 4) Journal Analytics (Tier-2, partial → complete)
+
+**Goal:** “why we win/lose” visibility.
+
+* Metrics: PF, Win%, E[R], Avg R, Max DD, Time-in-Market, Heatmap by weekday/hour.
+* Attribution: regime × strategy × symbol.
+  **DoD:** `/api/metrics` returns computed fields; dashboard charts render without N/A gaps.
+
+## 5) News Flat (Tier-2, partial)
+
+**Goal:** avoid high-impact news windows.
+
+* Planner: load calendar (CSV/JSON) → blackout intervals.
+* Guard: reject entries X minutes before/after.
+  **DoD:** calendar hot-reload; violations visible; toggle per symbol/asset class.
+
+---
+
+# Hardening & Ops (production readiness)
+
+* **Idempotency:** dedupe fills by `broker_order_id`.
+* **Crash recovery:** on boot, reconcile broker positions/orders → DB.
+* **Backoff & retry:** jittered retries on broker calls, with circuit breaker.
+* **Config clamps:** verify guardrails twice (boot + pre-exec).
+* **Observability:** structured logs (JSON) + counters/gauges (signals, rejects, fills latency, slippage, R today/week).
+* **Security:** API key required for write routes; CORS allowlist for your React host.
+
+---
+
+# Frontend sprint (React 18 + TS)
+
+1. **System dashboard**
+
+   * Status tiles (state, canTrade, currentR).
+   * Kill Switch button with confirmation modal.
+   * Toasts for `constraint_violation`, `guard_reject`, `order_submitted`, `fill`.
+
+2. **Trades & Analytics**
+
+   * Trades table (filter by date/symbol/strategy; CSV export).
+   * Metrics: PF, E[R], Win%, Max DD.
+   * Charts: cumulative PnL, drawdown, weekday/hour heatmap.
+
+3. **Risk & Constraints**
+
+   * Read-only view of effective constraints (after clamps).
+   * Indicators when Mental Governor / Tripwires are active.
+
+**DoD:** loads against live API; WS updates reflected within 1s; Lighthouse perf >90 on local.
+
+---
+
+# CI/CD & Testing
+
+* **E2E (mock broker)**: golden path, guard rejection, constraint violation, tripwire, partial fills, flatten-all.
+* **Replay CI**: 3-day CSV replay, assert non-zero trades & metrics sane.
+* **Static checks**: mypy, ruff, pytest min coverage gate.
+* **Docker**: one image for API, one for React; compose for local.
+
+---
+
+# Acceptance criteria (close the 8% gap)
+
+* In-Trade Manager: all exit modes + tests ✅
+* Multi-TF Fusion gating + benchmarks ✅
+* Mental Governor: size multiplier + cooldown + UI badge ✅
+* News Flat: blackout respected; tests ✅
+* Metrics route complete + React charts ✅
+* Recovery on restart proven (manual kill → restart → reconcile) ✅
+
+---
+
+1) In-Trade Manager (do this now)
+
+Interface
+
+# transmission/execution/intrade.py
+class InTradeManager:
+    def __init__(self, cfg): ...
+    def on_fill(self, pos): ...
+    def on_bar(self, pos, context) -> list[dict]:  # emits actions
+        # returns events: [{"type":"move_stop","price":...}, {"type":"scale_out","qty":...}, {"type":"time_exit"}]
+
+
+Rules (configurable)
+
+break_even_at_r: 1.0
+
+trail: {"mode":"atr"|"swing", "atr_mult":1.5, "lookback":5}
+
+scale_out: [{"at_r":1.0,"pct":0.5},{"at_r":2.0,"pct":0.5}]
+
+max_bars_in_trade: 120
+
+Integration
+
+Engine listens for intrade.on_bar(...) events and translates to move_stop, reduce, or close.
+
+Log each transition with trace_id so PnL deltas reconcile cleanly.
+
+Tests (deterministic)
+
+Synthetic series where price walks +1R → 2R; assert BE move, 50% scale, final exit.
+
+ATR-trail: rising lows advance stop; quick reversal hits stop at expected bar.
+
+Time-stop on a flat series closes exactly at N bars.
+
+2) Multi-Timeframe Fusion (after intrade is green)
+
+Implementation tips
+
+Maintain a rolling HTF cache built from LTF bars (no external fetch):
+resample(LTF, 15m/1h) → compute ADX/ATR/VWAP → keep last N bars.
+
+Gate entries:
+
+Example: allow TREND entries only if HTF_ADX > threshold and sign(LTF trend) == sign(HTF trend).
+
+Keep it toggleable and log when a valid LTF signal is suppressed by HTF gate (so you can measure benefit).
+
+Perf target
+
+Precompute per bar; budget < 2–5 ms total; reuse rolling windows (no full recompute).
+
+3) Mental Governor
+
+Signal-time only (don’t mutate live trades yet—keep it simple):
+
+Inputs: drawdown_R_rolling, loss_streak, self_score(1..5).
+
+Output: size_multiplier ∈ {1.0, 0.75, 0.5, 0.0} + optional cooldown until t+N bars.
+
+Surface a badge in UI: CALM / CAUTION / COOL-DOWN.
+
+Log rationale: which rule fired, inputs, resulting multiplier.
+
+4) Journal Analytics (metrics route → UI)
+
+Server
+
+/api/metrics returns:
+
+profit_factor, win_rate, expected_R, max_drawdown_R, time_in_market, avg_hold_minutes
+
+pnls_by_day, pnls_by_hour, regime_strategy_symbol_matrix
+UI
+
+Charts: cumulative PnL + drawdown; heatmaps (weekday × hour; regime × strategy).
+
+Data quality: ensure every trade has entry_ts, exit_ts, result_R, regime, strategy, symbol.
+
+5) News Flat
+
+Planner
+
+Load news_calendar.{csv|json} → build blackout windows per symbol/asset class.
+
+Hot-reload file every X minutes (watch mtime).
+Guard
+
+On entry attempt: if now in blackout(symbol): reject("news_blackout").
+
+Dashboard: show a small “NEWS” chip near symbol when in window.
+
+Hardening & Ops (quick wins)
+
+Idempotency: maintain a seen_fills set keyed by broker_order_id + exec_id.
+
+Crash recovery: on boot, reconcile broker.positions() and open_orders() → bring DB to truth; journal a reconcile event.
+
+Retries: exponential backoff with jitter on broker calls; add a circuit breaker that blocks new submits if adapter is flapping.
+
+Double clamps: validate constraints at boot and pre-submit (defense in depth).
+
+Security: require X-API-Key on /signals/generate and /system/flatten_all; CORS allowlist your React origin.
+
+Observability: counters you’ll actually watch:
+
+signals_total{strategy,regime}, orders_submitted_total,
+guard_rejections_total{reason}, constraint_violations_total{rule},
+fills_latency_ms_hist, slippage_ticks_hist, r_today, r_week.
+
+Frontend sprint shape
+
+Dash: three tiles (state / canTrade / currentR), Orders/Positions tables, Kill Switch modal, toasts for WS events.
+
+Trades: filterable table + CSV export; links to detail drawer (fills, slippage, timeline).
+
+Analytics: PF, E[R], Win%, MaxDD, cumulative PnL, drawdown, heatmaps.
+
+Risk view: read-only effective constraints (post-clamp) + chips for Mental Governor/Tripwires.
+
+Lighthouse > 90 is easy with Vite + Tailwind; keep charts lazy-loaded.
+
+CI/CD you can add in one pass
+
+Unit + E2E (mock) gates on PR.
+
+Replay CI with a tiny 3-day CSV: assert non-zero trades and stable PF/WR ranges (protects from silent regressions).
+
+Docker compose for local: api + react; env-based CORS + API key.
+
+Acceptance criteria notes
+
+When you mark “Recovery on restart,” demo it: start a trade, kill API, restart → the engine reconciles, moves back to MANAGED, and UI shows consistent position/order state.
+
+For “Metrics + charts,” pin exact field names in the /api/metrics contract now so the React team can build without churn.
